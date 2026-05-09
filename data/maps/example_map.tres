@@ -1,0 +1,75 @@
+[gd_resource type="Resource" script_class="HexMapData" format=3 uid="uid://byij5cfuo3jx"]
+
+[ext_resource type="Script" uid="uid://cv361wsf6d3rf" path="res://scripts/hex_map_data.gd" id="1_mapdata"]
+[ext_resource type="Script" uid="uid://bxinyrv7a62jb" path="res://scripts/hex_tile_data.gd" id="2_tiledata"]
+
+[sub_resource type="Resource" id="t_0_0"]
+script = ExtResource("2_tiledata")
+
+[sub_resource type="Resource" id="t_1_0"]
+script = ExtResource("2_tiledata")
+coord = Vector2i(1, 0)
+
+[sub_resource type="Resource" id="t_2_0"]
+script = ExtResource("2_tiledata")
+coord = Vector2i(2, 0)
+tile_type = 2
+
+[sub_resource type="Resource" id="t_0_1"]
+script = ExtResource("2_tiledata")
+coord = Vector2i(0, 1)
+tile_type = 1
+
+[sub_resource type="Resource" id="t_1_1"]
+script = ExtResource("2_tiledata")
+coord = Vector2i(1, 1)
+
+[sub_resource type="Resource" id="t_2_1"]
+script = ExtResource("2_tiledata")
+coord = Vector2i(2, 1)
+tile_type = 2
+
+[sub_resource type="Resource" id="t_0_2"]
+script = ExtResource("2_tiledata")
+coord = Vector2i(0, 2)
+tile_type = 1
+
+[sub_resource type="Resource" id="t_1_2"]
+script = ExtResource("2_tiledata")
+coord = Vector2i(1, 2)
+tile_type = 2
+
+[sub_resource type="Resource" id="t_2_2"]
+script = ExtResource("2_tiledata")
+coord = Vector2i(2, 2)
+
+[sub_resource type="Resource" id="t_m1_0"]
+script = ExtResource("2_tiledata")
+coord = Vector2i(-1, 0)
+tile_type = 1
+
+[sub_resource type="Resource" id="t_m1_1"]
+script = ExtResource("2_tiledata")
+coord = Vector2i(-1, 1)
+
+[sub_resource type="Resource" id="t_m1_2"]
+script = ExtResource("2_tiledata")
+coord = Vector2i(-1, 2)
+tile_type = 2
+
+[resource]
+script = ExtResource("1_mapdata")
+tiles = {
+Vector2i(-1, 0): SubResource("t_m1_0"),
+Vector2i(-1, 1): SubResource("t_m1_1"),
+Vector2i(-1, 2): SubResource("t_m1_2"),
+Vector2i(0, 0): SubResource("t_0_0"),
+Vector2i(0, 1): SubResource("t_0_1"),
+Vector2i(0, 2): SubResource("t_0_2"),
+Vector2i(1, 0): SubResource("t_1_0"),
+Vector2i(1, 1): SubResource("t_1_1"),
+Vector2i(1, 2): SubResource("t_1_2"),
+Vector2i(2, 0): SubResource("t_2_0"),
+Vector2i(2, 1): SubResource("t_2_1"),
+Vector2i(2, 2): SubResource("t_2_2")
+}

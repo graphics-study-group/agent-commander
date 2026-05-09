@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://yxqrtpo31cgx"]
+
+[ext_resource type="PackedScene" uid="uid://dr0hkcwia5gjy" path="res://assets/HexagonalPrism.glb" id="1_hex"]
+
+[node name="HexTilePlain" type="Node3D" unique_id=1952696019]
+
+[node name="HexagonalPrism" parent="." unique_id=782603477 instance=ExtResource("1_hex")]

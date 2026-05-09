@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://dljor77h48t2e"]
+
+[ext_resource type="PackedScene" uid="uid://dr0hkcwia5gjy" path="res://assets/HexagonalPrism.glb" id="1_hex"]
+
+[node name="HexTileRoad" type="Node3D" unique_id=1607098919]
+
+[node name="HexagonalPrism" parent="." unique_id=1576816151 instance=ExtResource("1_hex")]
+transform = Transform3D(1, 0, 0, 0, 0.5, 0, 0, 0, 1, 0, 0, 0)

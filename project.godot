@@ -15,6 +15,10 @@ run/main_scene="uid://dhblb2tjvp7et"
 config/features=PackedStringArray("4.6", "Mobile")
 config/icon="res://icon.svg"
 
+[autoload]
+
+HexMapManager="*res://scripts/hex_map_manager.gd"
+
 [editor]
 
 version_control/plugin_name="GitPlugin"
