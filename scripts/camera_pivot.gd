@@ -10,16 +10,16 @@ extends Node3D
 var cam: Camera3D
 
 func _ready():
-	cam = get_child(0)
+    cam = get_child(0)
 
 func _process(delta):
-	# WASD 平移
-	var input_dir = Vector3.ZERO
-	if Input.is_action_pressed("ui_left"):  input_dir.x -= 1
-	if Input.is_action_pressed("ui_right"): input_dir.x += 1
-	if Input.is_action_pressed("ui_up"):input_dir.z -= 1
-	if Input.is_action_pressed("ui_down"):input_dir.z += 1
+    # WASD 平移
+    var input_dir = Vector3.ZERO
+    if Input.is_action_pressed("ui_left"):  input_dir.x -= 1
+    if Input.is_action_pressed("ui_right"): input_dir.x += 1
+    if Input.is_action_pressed("ui_up"):input_dir.z -= 1
+    if Input.is_action_pressed("ui_down"):input_dir.z += 1
 
-	# 保持俯视平面移动，不歪
-	input_dir = input_dir.normalized()
-	position += input_dir * move_speed * delta
+    # 保持俯视平面移动，不歪
+    input_dir = input_dir.normalized()
+    position += input_dir * move_speed * delta
