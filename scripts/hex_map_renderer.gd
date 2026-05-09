@@ -28,6 +28,8 @@ func _spawn_tile(tile: HexTileData) -> void:
 	var world_pos: Vector3 = HexUtils.axial_to_world(tile.coord.x, tile.coord.y)
 	node.position = world_pos
 	node.name = "Tile_%d_%d" % [tile.coord.x, tile.coord.y]
+	if node is HexTileBase:
+		(node as HexTileBase).set_tile_info(tile.coord, tile)
 	add_child(node)
 	_tile_nodes[tile.coord] = node
 
@@ -49,3 +51,8 @@ func _clear_tiles() -> void:
 # Returns the tile Node3D for the given axial coord, or null.
 func get_tile_node(q: int, r: int) -> Node3D:
 	return _tile_nodes.get(Vector2i(q, r), null)
+
+func reset_all_tiles() -> void:
+	for node in _tile_nodes.values():
+		if node is HexTileBase:
+			(node as HexTileBase).reset_state()

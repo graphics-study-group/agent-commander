@@ -1,8 +1,17 @@
 [gd_scene format=3 uid="uid://dljor77h48t2e"]
 
-[ext_resource type="PackedScene" uid="uid://dr0hkcwia5gjy" path="res://assets/HexagonalPrism.glb" id="1_hex"]
+[ext_resource type="Script" uid="uid://bi117lvhvt6ln" path="res://scripts/hex_tile_road.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://dr0hkcwia5gjy" path="res://assets/HexagonalPrism.glb" id="2_hex"]
 
-[node name="HexTileRoad" type="Node3D" unique_id=1607098919]
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_tile"]
+height = 0.2
+radius = 0.4
 
-[node name="HexagonalPrism" parent="." unique_id=1576816151 instance=ExtResource("1_hex")]
+[node name="HexTileRoad" type="Area3D" unique_id=1607098919]
+script = ExtResource("1_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1689712288]
+shape = SubResource("CylinderShape3D_tile")
+
+[node name="HexagonalPrism" parent="." unique_id=1576816151 instance=ExtResource("2_hex")]
 transform = Transform3D(1, 0, 0, 0, 0.5, 0, 0, 0, 1, 0, 0, 0)
