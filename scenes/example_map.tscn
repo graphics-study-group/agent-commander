@@ -1,7 +1,8 @@
 [gd_scene format=3 uid="uid://dhblb2tjvp7et"]
 
-[ext_resource type="PackedScene" uid="uid://dr0hkcwia5gjy" path="res://assets/HexagonalPrism.glb" id="1_bcyl5"]
 [ext_resource type="PackedScene" uid="uid://cwctcymjbaf7f" path="res://scenes/Camera.tscn" id="2_csnki"]
+[ext_resource type="Script" uid="uid://hexmapscript001" path="res://scripts/hex_map.gd" id="3_hexmap"]
+[ext_resource type="PackedScene" uid="uid://c2ny0pmypyiuq" path="res://scenes/commander_ui.tscn" id="4_cmdui"]
 
 [node name="Root" type="Node3D" unique_id=1280752598]
 
@@ -9,17 +10,11 @@
 transform = Transform3D(-4.3711385e-08, 0.70710677, -0.7071067, 0, 0.70710677, 0.7071067, 0.99999994, 3.090862e-08, -3.0908616e-08, -20.795395, 13.268564, 0)
 
 [node name="HexagonalMap" type="Node3D" parent="." unique_id=1299644407]
-
-[node name="HexagonalPrism" parent="HexagonalMap" unique_id=891460654 instance=ExtResource("1_bcyl5")]
-transform = Transform3D(0.97, 0, 0, 0, 0.97, 0, 0, 0, 0.97, 0, 0, 0)
-
-[node name="HexagonalPrism2" parent="HexagonalMap" unique_id=519648682 instance=ExtResource("1_bcyl5")]
-transform = Transform3D(0.9699999, 0, -0.00049096113, 0, 0.97, 0, 0.00049096113, 0, 0.9699999, 0.433, 0, 0.75)
-
-[node name="HexagonalPrism3" parent="HexagonalMap" unique_id=625301802 instance=ExtResource("1_bcyl5")]
-transform = Transform3D(0.97, 0, 0, 0, 0.97, 0, 0, 0, 0.97, -0.433, 0, 0.75)
-
-[node name="HexagonalPrism4" parent="HexagonalMap" unique_id=1905655524 instance=ExtResource("1_bcyl5")]
-transform = Transform3D(0.9699999, 0, -0.00049096113, 0, 0.97, 0, 0.00049096113, 0, 0.9699999, 0, 0, 1.5)
+script = ExtResource("3_hexmap")
 
 [node name="CameraRoot" parent="." unique_id=470249213 instance=ExtResource("2_csnki")]
+
+[node name="UILayer" type="CanvasLayer" parent="." unique_id=2000001]
+layer = 1
+
+[node name="CommanderUI" parent="UILayer" unique_id=2000002 instance=ExtResource("4_cmdui")]

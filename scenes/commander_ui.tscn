@@ -1,0 +1,55 @@
+[gd_scene format=3 uid="uid://c2ny0pmypyiuq"]
+
+[ext_resource type="Script" uid="uid://cuitestscript01" path="res://scripts/commander_ui.gd" id="1_cmdui"]
+
+[node name="CommanderUI" type="VBoxContainer" unique_id=1000000]
+anchor_left = 0.62
+anchor_right = 1.0
+anchor_top = 0.0
+anchor_bottom = 1.0
+script = ExtResource("1_cmdui")
+
+[node name="UnitTitle" type="Label" parent="." unique_id=3000001]
+layout_mode = 2
+text = "-- 部队状态 --"
+horizontal_alignment = 1
+
+[node name="UnitStats" type="RichTextLabel" parent="." unique_id=3000002]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 130)
+bbcode_enabled = true
+fit_content = true
+
+[node name="HSep" type="HSeparator" parent="." unique_id=3000003]
+layout_mode = 2
+
+[node name="OutputContainer" type="PanelContainer" parent="." unique_id=3000004]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="OutputText" type="RichTextLabel" parent="OutputContainer" unique_id=3000005]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+bbcode_enabled = true
+scroll_following = true
+
+[node name="StatusLabel" type="Label" parent="." unique_id=3000006]
+layout_mode = 2
+text = ""
+
+[node name="InputContainer" type="HBoxContainer" parent="." unique_id=3000007]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 80)
+
+[node name="InputText" type="TextEdit" parent="InputContainer" unique_id=3000008]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+placeholder_text = "输入战术指令... (Ctrl+Enter)"
+
+[node name="SendButton" type="Button" parent="InputContainer" unique_id=3000009]
+layout_mode = 2
+size_flags_vertical = 4
+custom_minimum_size = Vector2(70, 0)
+text = "发送"
