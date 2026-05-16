@@ -1,0 +1,46 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/map_editor.gd" id="1_editor"]
+[ext_resource type="PackedScene" path="res://scenes/Camera.tscn" id="2_cam"]
+[ext_resource type="Script" path="res://scripts/hex_map.gd" id="3_hex"]
+
+[node name="Root" type="Node3D"]
+script = ExtResource("1_editor")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-4.3711385e-08, 0.70710677, -0.7071067, 0, 0.70710677, 0.7071067, 0.99999994, 3.090862e-08, -3.0908616e-08, -20.795395, 13.268564, 0)
+
+[node name="HexagonalMap" type="Node3D" parent="."]
+script = ExtResource("3_hex")
+
+[node name="CameraRoot" parent="." instance=ExtResource("2_cam")]
+
+[node name="UILayer" type="CanvasLayer" parent="."]
+layer = 2
+
+[node name="EditorUI" type="PanelContainer" parent="UILayer"]
+anchors_preset = 1
+anchor_left = 1.0
+offset_left = -320.0
+offset_right = -16.0
+offset_bottom = 180.0
+
+[node name="VBox" type="VBoxContainer" parent="UILayer/EditorUI"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="UILayer/EditorUI/VBox"]
+layout_mode = 2
+text = "Map Editor"
+
+[node name="GenerateButton" type="Button" parent="UILayer/EditorUI/VBox"]
+layout_mode = 2
+text = "Generate Random"
+
+[node name="SaveButton" type="Button" parent="UILayer/EditorUI/VBox"]
+layout_mode = 2
+text = "Save Map"
+
+[node name="StatusLabel" type="Label" parent="UILayer/EditorUI/VBox"]
+layout_mode = 2
+text = "Ready"
+autowrap_mode = 2

@@ -1,0 +1,23 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/game_main.gd" id="1_game"]
+[ext_resource type="PackedScene" path="res://scenes/Camera.tscn" id="2_cam"]
+[ext_resource type="Script" path="res://scripts/hex_map.gd" id="3_hex"]
+[ext_resource type="PackedScene" path="res://scenes/commander_ui.tscn" id="4_cmdui"]
+
+[node name="Root" type="Node3D"]
+script = ExtResource("1_game")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-4.3711385e-08, 0.70710677, -0.7071067, 0, 0.70710677, 0.7071067, 0.99999994, 3.090862e-08, -3.0908616e-08, -20.795395, 13.268564, 0)
+
+[node name="HexagonalMap" type="Node3D" parent="."]
+script = ExtResource("3_hex")
+auto_generate_on_ready = false
+
+[node name="CameraRoot" parent="." instance=ExtResource("2_cam")]
+
+[node name="UILayer" type="CanvasLayer" parent="."]
+layer = 1
+
+[node name="CommanderUI" parent="UILayer" instance=ExtResource("4_cmdui")]

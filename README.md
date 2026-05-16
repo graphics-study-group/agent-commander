@@ -5,7 +5,9 @@
 ## 项目现状
 
 - 引擎：Godot 4.6（`project.godot` 中配置）
-- 主要场景：`res://scenes/example_map.tscn`
+- 默认主菜单：`res://scenes/main_menu.tscn`
+- 地图编辑器场景：`res://scenes/map_editor.tscn`
+- 游戏主场景（读取固定地图）：`res://scenes/game_main.tscn`
 - 渲染方式：Mobile Renderer
 
 
@@ -22,10 +24,31 @@
 └─ scripts/                      # 脚本
 ```
 
+## 地图编辑与加载
+
+- 地图数据类型：`MapData`（`res://scripts/map_data.gd`）
+- 默认地图文件：`res://maps/default_map.tres`
+- 编辑器另存一份到：`user://maps/default_map.tres`
+
+### 编辑器流程
+
+1. 打开并运行 `res://scenes/map_editor.tscn`。
+2. 点击 **Generate Random** 随机生成地图（沿用当前地图逻辑）。
+3. 点击 **Save Map** 保存到 `res://maps/default_map.tres`，并尝试导出到 `user://maps/default_map.tres`。
+
+### 游戏流程
+
+1. 打开并运行 `res://scenes/game_main.tscn`。
+2. 场景启动时固定读取 `res://maps/default_map.tres`。
+3. 若读取失败，会回退为随机地图并打印 warning。
+
 ## 运行方式
 
 1. 使用 Godot 4.6+ 打开项目根目录。
-2. 直接运行项目（当前主场景已在 `project.godot` 中指定）。
-3. 默认输入：
+2. 直接运行项目会先进入主菜单。
+3. 在主菜单中选择地图后点击 **Start Game** 进入游戏。
+4. 点击 **Map Editor** 进入地图编辑器。
+5. 如需直接运行固定地图开局，请手动运行 `res://scenes/game_main.tscn`。
+6. 默认输入：
    - `W/A/S/D`：相机平移
    - 鼠标滚轮输入动作已预留（`zoom_in` / `zoom_out`）

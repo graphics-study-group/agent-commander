@@ -1,0 +1,75 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/main_menu.gd" id="1_menu"]
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_menu")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.07, 0.09, 0.14, 1)
+
+[node name="CenterPanel" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Panel" type="PanelContainer" parent="CenterPanel"]
+custom_minimum_size = Vector2(560, 360)
+
+[node name="PanelVBox" type="VBoxContainer" parent="CenterPanel/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="Title" type="Label" parent="CenterPanel/Panel/PanelVBox"]
+layout_mode = 2
+text = "Agent Commander"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="CenterPanel/Panel/PanelVBox"]
+layout_mode = 2
+text = "Choose a map, enter the battlefield, or open the editor."
+horizontal_alignment = 1
+
+[node name="MapRow" type="HBoxContainer" parent="CenterPanel/Panel/PanelVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MapLabel" type="Label" parent="CenterPanel/Panel/PanelVBox/MapRow"]
+layout_mode = 2
+text = "Map"
+custom_minimum_size = Vector2(80, 0)
+
+[node name="MapOption" type="OptionButton" parent="CenterPanel/Panel/PanelVBox/MapRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Buttons" type="HBoxContainer" parent="CenterPanel/Panel/PanelVBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="RefreshButton" type="Button" parent="CenterPanel/Panel/PanelVBox/Buttons"]
+layout_mode = 2
+text = "Refresh"
+
+[node name="EditorButton" type="Button" parent="CenterPanel/Panel/PanelVBox/Buttons"]
+layout_mode = 2
+text = "Map Editor"
+
+[node name="PlayButton" type="Button" parent="CenterPanel/Panel/PanelVBox/Buttons"]
+layout_mode = 2
+text = "Start Game"
+
+[node name="StatusLabel" type="Label" parent="CenterPanel/Panel/PanelVBox"]
+layout_mode = 2
+text = ""
+autowrap_mode = 2

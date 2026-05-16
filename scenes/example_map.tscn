@@ -1,7 +1,7 @@
-[gd_scene format=3 uid="uid://dhblb2tjvp7et"]
+[gd_scene format=3 uid="uid://bd8ati1djo5wh"]
 
 [ext_resource type="PackedScene" uid="uid://cwctcymjbaf7f" path="res://scenes/Camera.tscn" id="2_csnki"]
-[ext_resource type="Script" uid="uid://hexmapscript001" path="res://scripts/hex_map.gd" id="3_hexmap"]
+[ext_resource type="Script" uid="uid://co5386b6e8wtk" path="res://scripts/hex_map.gd" id="3_hexmap"]
 [ext_resource type="PackedScene" uid="uid://c2ny0pmypyiuq" path="res://scenes/commander_ui.tscn" id="4_cmdui"]
 
 [node name="Root" type="Node3D" unique_id=1280752598]
@@ -15,6 +15,6 @@ script = ExtResource("3_hexmap")
 [node name="CameraRoot" parent="." unique_id=470249213 instance=ExtResource("2_csnki")]
 
 [node name="UILayer" type="CanvasLayer" parent="." unique_id=2000001]
-layer = 1
 
 [node name="CommanderUI" parent="UILayer" unique_id=2000002 instance=ExtResource("4_cmdui")]
+anchors_preset = -1

@@ -1,50 +1,54 @@
 extends Node3D
 
 const TILE_SCENE_PATH := "res://assets/HexagonalPrism.glb"
-const TILE_SCALE      := 0.97
-const GRID_COLS       := 16
-const GRID_ROWS       := 16
-const H_STEP          := 0.866
-const V_STEP          := 0.75
-const ROW_OFFSET      := 0.433
+const TILE_SCALE := 0.97
+const GRID_COLS := 16
+const GRID_ROWS := 16
+const H_STEP := 0.866
+const V_STEP := 0.75
+const ROW_OFFSET := 0.433
 
-const HEX_DIST_KM     := 40.0   # km between adjacent hex centers
-# A* relative weights (road is 2× faster than grass)
-const ASTAR_GRASS     := 10.0
-const ASTAR_ROAD      := 5.0
+const HEX_DIST_KM := 40.0
+const ASTAR_GRASS := 10.0
+const ASTAR_ROAD := 5.0
 
 enum Terrain { GRASSLAND, MOUNTAIN, LAKE }
 
-# Neighbor offsets [dc, dr] for each of the 6 directions
-const OFFSETS_EVEN := [[0,-1],[1,0],[0,1],[-1,1],[-1,0],[-1,-1]]
-const OFFSETS_ODD  := [[1,-1],[1,0],[1,1],[0,1],[-1,0],[0,-1]]
+const OFFSETS_EVEN := [[0, -1], [1, 0], [0, 1], [-1, 1], [-1, 0], [-1, -1]]
+const OFFSETS_ODD := [[1, -1], [1, 0], [1, 1], [0, 1], [-1, 0], [0, -1]]
 
-var _terrain: Array = []   # [row][col] -> Terrain
-var _roads:   Array = []   # [row][col] -> int bitmask (bit i = road in dir i)
+@export var auto_generate_on_ready := true
+@export_file("*.tres", "*.res") var startup_map_path := ""
+
+var _grid_cols := GRID_COLS
+var _grid_rows := GRID_ROWS
+var _terrain: Array = []
+var _roads: Array = []
 
 var _unit: Unit
 var _unit_col := 8
 var _unit_row := 8
 
+var _generated_root: Node3D
 var _marker: MeshInstance3D
 var _tooltip_canvas: CanvasLayer
 var _tooltip: PanelContainer
 var _tooltip_label: RichTextLabel
 
 var _move_queue: Array = []
-var _is_moving  := false
-var _speed_buff_kmh   := 0.0  # temporary extra speed in km/h
-var _speed_buff_hexes := 0    # hexes remaining for buff
+var _is_moving := false
+var _speed_buff_kmh := 0.0
+var _speed_buff_hexes := 0
 
 
 func _ready() -> void:
 	add_to_group("hex_map")
-	_generate_terrain()
-	_generate_roads()
-	_find_start_pos()
-	_generate_grid()
-	_draw_roads()
-	_create_marker()
+	if auto_generate_on_ready:
+		if not startup_map_path.is_empty():
+			if not load_map_from_path(startup_map_path):
+				regenerate_random_map()
+		else:
+			regenerate_random_map()
 	call_deferred("_init_refs")
 
 
@@ -55,7 +59,7 @@ func _process(_delta: float) -> void:
 	if camera == null:
 		return
 	var screen_pos := camera.unproject_position(_marker.global_position)
-	var mouse_pos  := get_viewport().get_mouse_position()
+	var mouse_pos := get_viewport().get_mouse_position()
 	if screen_pos.distance_to(mouse_pos) < 44.0 and _unit != null:
 		_tooltip.visible = true
 		_tooltip_label.text = _unit.get_display_text()
@@ -82,14 +86,91 @@ func _init_refs() -> void:
 	_create_tooltip()
 
 
-# ── Terrain & road generation ─────────────────────────────────────────────────
+func regenerate_random_map() -> void:
+	_grid_cols = GRID_COLS
+	_grid_rows = GRID_ROWS
+	_generate_terrain()
+	_generate_roads()
+	_find_start_pos()
+	_rebuild_visuals()
+
+
+func load_map_from_path(path: String) -> bool:
+	var loaded := ResourceLoader.load(path)
+	if loaded == null:
+		push_warning("Map resource not found: %s" % path)
+		return false
+	if not (loaded is MapData):
+		push_warning("Resource is not MapData: %s" % path)
+		return false
+	return load_map_data(loaded as MapData)
+
+
+func load_map_data(data: MapData) -> bool:
+	if data == null:
+		return false
+	var validation_error := data.validate()
+	if not validation_error.is_empty():
+		push_warning("Invalid map data: %s" % validation_error)
+		return false
+
+	_grid_cols = data.cols
+	_grid_rows = data.rows
+	_terrain = _copy_grid(data.terrain)
+	_roads = _copy_grid(data.roads)
+	_unit_col = data.spawn_col
+	_unit_row = data.spawn_row
+
+	if _terrain[_unit_row][_unit_col] != Terrain.GRASSLAND:
+		_find_start_pos()
+
+	_rebuild_visuals()
+	return true
+
+
+func export_map_data() -> MapData:
+	var data := MapData.new()
+	data.version = 1
+	data.cols = _grid_cols
+	data.rows = _grid_rows
+	data.terrain = _copy_grid(_terrain)
+	data.roads = _copy_grid(_roads)
+	data.spawn_col = _unit_col
+	data.spawn_row = _unit_row
+	return data
+
+
+func _copy_grid(src: Array) -> Array:
+	var out: Array = []
+	for row in src:
+		out.append((row as Array).duplicate())
+	return out
+
+
+func _rebuild_visuals() -> void:
+	_clear_generated_root()
+	_generate_grid()
+	_draw_roads()
+	_create_marker()
+	_update_marker_pos()
+
+
+func _clear_generated_root() -> void:
+	if is_instance_valid(_generated_root):
+		_generated_root.queue_free()
+	_generated_root = Node3D.new()
+	_generated_root.name = "GeneratedMap"
+	add_child(_generated_root)
+
+
+# Terrain and road generation
 
 func _generate_terrain() -> void:
-	_terrain.resize(GRID_ROWS)
-	for r in range(GRID_ROWS):
+	_terrain.resize(_grid_rows)
+	for r in range(_grid_rows):
 		_terrain[r] = []
-		_terrain[r].resize(GRID_COLS)
-		for c in range(GRID_COLS):
+		_terrain[r].resize(_grid_cols)
+		for c in range(_grid_cols):
 			var v := randf()
 			if v < 0.15:
 				_terrain[r][c] = Terrain.MOUNTAIN
@@ -101,10 +182,10 @@ func _generate_terrain() -> void:
 
 func _find_start_pos() -> void:
 	var best_dist := INF
-	for r in range(GRID_ROWS):
-		for c in range(GRID_COLS):
+	for r in range(_grid_rows):
+		for c in range(_grid_cols):
 			if _terrain[r][c] == Terrain.GRASSLAND:
-				var d := _hex_dist(c, r, GRID_COLS / 2, GRID_ROWS / 2)
+				var d := _hex_dist(c, r, _grid_cols / 2, _grid_rows / 2)
 				if d < best_dist:
 					best_dist = d
 					_unit_col = c
@@ -112,36 +193,36 @@ func _find_start_pos() -> void:
 
 
 func _generate_roads() -> void:
-	_roads.resize(GRID_ROWS)
-	for r in range(GRID_ROWS):
+	_roads.resize(_grid_rows)
+	for r in range(_grid_rows):
 		_roads[r] = []
-		_roads[r].resize(GRID_COLS)
-		for c in range(GRID_COLS):
+		_roads[r].resize(_grid_cols)
+		for c in range(_grid_cols):
 			_roads[r][c] = 0
 
-	var attempts := GRID_COLS * GRID_ROWS
+	var attempts := _grid_cols * _grid_rows
 	for _i in range(attempts):
-		var col := randi() % GRID_COLS
-		var row := randi() % GRID_ROWS
+		var col := randi() % _grid_cols
+		var row := randi() % _grid_rows
 		if _terrain[row][col] != Terrain.GRASSLAND:
 			continue
 		var dir := randi() % 6
-		var nb  := get_neighbor(col, row, dir)
+		var nb := get_neighbor(col, row, dir)
 		if not _in_bounds(nb.x, nb.y):
 			continue
 		if _terrain[nb.y][nb.x] != Terrain.GRASSLAND:
 			continue
-		_roads[row][col]     |= (1 << dir)
-		_roads[nb.y][nb.x]  |= (1 << ((dir + 3) % 6))
+		_roads[row][col] |= (1 << dir)
+		_roads[nb.y][nb.x] |= (1 << ((dir + 3) % 6))
 
 
-# ── Hex geometry ──────────────────────────────────────────────────────────────
+# Hex geometry
 
 func hex_to_world(col: int, row: int) -> Vector3:
-	var cx := (GRID_COLS - 1) * H_STEP * 0.5
-	var cz := (GRID_ROWS - 1) * V_STEP * 0.5
-	var x  := col * H_STEP + (ROW_OFFSET if row % 2 == 1 else 0.0) - cx
-	var z  := row * V_STEP - cz
+	var cx := (_grid_cols - 1) * H_STEP * 0.5
+	var cz := (_grid_rows - 1) * V_STEP * 0.5
+	var x := col * H_STEP + (ROW_OFFSET if row % 2 == 1 else 0.0) - cx
+	var z := row * V_STEP - cz
 	return Vector3(x, 0.0, z)
 
 
@@ -151,7 +232,7 @@ func get_neighbor(col: int, row: int, dir: int) -> Vector2i:
 
 
 func _in_bounds(col: int, row: int) -> bool:
-	return col >= 0 and col < GRID_COLS and row >= 0 and row < GRID_ROWS
+	return col >= 0 and col < _grid_cols and row >= 0 and row < _grid_rows
 
 
 func _get_direction(fc: int, fr: int, tc: int, tr: int) -> int:
@@ -163,24 +244,27 @@ func _get_direction(fc: int, fr: int, tc: int, tr: int) -> int:
 	return -1
 
 
-# ── Grid rendering ────────────────────────────────────────────────────────────
+# Grid rendering
 
 func _generate_grid() -> void:
-	var tile_scene   := load(TILE_SCENE_PATH) as PackedScene
-	var mat_grass    := _solid_mat(Color(0.35, 0.65, 0.25))
+	var tile_scene := load(TILE_SCENE_PATH) as PackedScene
+	var mat_grass := _solid_mat(Color(0.35, 0.65, 0.25))
 	var mat_mountain := _solid_mat(Color(0.52, 0.40, 0.28))
-	var mat_lake     := _solid_mat(Color(0.20, 0.45, 0.85))
+	var mat_lake := _solid_mat(Color(0.20, 0.45, 0.85))
 
-	for row in range(GRID_ROWS):
-		for col in range(GRID_COLS):
+	for row in range(_grid_rows):
+		for col in range(_grid_cols):
 			var tile := tile_scene.instantiate()
 			tile.position = hex_to_world(col, row)
-			tile.scale    = Vector3.ONE * TILE_SCALE
+			tile.scale = Vector3.ONE * TILE_SCALE
 			match _terrain[row][col]:
-				Terrain.MOUNTAIN: _set_mat_recursive(tile, mat_mountain)
-				Terrain.LAKE:     _set_mat_recursive(tile, mat_lake)
-				_:                _set_mat_recursive(tile, mat_grass)
-			add_child(tile)
+				Terrain.MOUNTAIN:
+					_set_mat_recursive(tile, mat_mountain)
+				Terrain.LAKE:
+					_set_mat_recursive(tile, mat_lake)
+				_:
+					_set_mat_recursive(tile, mat_grass)
+			_generated_root.add_child(tile)
 
 
 func _solid_mat(color: Color) -> StandardMaterial3D:
@@ -196,16 +280,16 @@ func _set_mat_recursive(node: Node, mat: Material) -> void:
 		_set_mat_recursive(child, mat)
 
 
-# ── Road rendering ────────────────────────────────────────────────────────────
+# Road rendering
 
 func _draw_roads() -> void:
-	var verts   := PackedVector3Array()
+	var verts := PackedVector3Array()
 	var indices := PackedInt32Array()
-	var idx     := 0
+	var idx := 0
 	const ROAD_W := 0.08
 
-	for row in range(GRID_ROWS):
-		for col in range(GRID_COLS):
+	for row in range(_grid_rows):
+		for col in range(_grid_cols):
 			var mask: int = _roads[row][col]
 			if mask == 0:
 				continue
@@ -220,60 +304,65 @@ func _draw_roads() -> void:
 				var nb_world := hex_to_world(nb.x, nb.y)
 				nb_world.y = 0.28
 				var edge_mid := (center + nb_world) * 0.5
-				var seg_dir  := (edge_mid - center).normalized()
-				var perp     := Vector3(seg_dir.z, 0.0, -seg_dir.x) * (ROAD_W * 0.5)
+				var seg_dir := (edge_mid - center).normalized()
+				var perp := Vector3(seg_dir.z, 0.0, -seg_dir.x) * (ROAD_W * 0.5)
 
 				verts.append(center - perp)
 				verts.append(center + perp)
 				verts.append(edge_mid + perp)
 				verts.append(edge_mid - perp)
-				indices.append(idx);     indices.append(idx + 1); indices.append(idx + 2)
-				indices.append(idx);     indices.append(idx + 2); indices.append(idx + 3)
+				indices.append(idx)
+				indices.append(idx + 1)
+				indices.append(idx + 2)
+				indices.append(idx)
+				indices.append(idx + 2)
+				indices.append(idx + 3)
 				idx += 4
 
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_INDEX]  = indices
+	arrays[Mesh.ARRAY_INDEX] = indices
 
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 
-	var mi  := MeshInstance3D.new()
+	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color  = Color(0.55, 0.55, 0.55)
-	mat.shading_mode  = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(0.55, 0.55, 0.55)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.no_depth_test = true
 	mi.material_override = mat
-	add_child(mi)
+	_generated_root.add_child(mi)
 
 
-# ── Unit marker ───────────────────────────────────────────────────────────────
+# Unit marker
 
 func _create_marker() -> void:
 	_marker = MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
-	cyl.top_radius    = 0.18
+	cyl.top_radius = 0.18
 	cyl.bottom_radius = 0.18
-	cyl.height        = 0.45
+	cyl.height = 0.45
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color     = Color(0.25, 0.55, 1.0)
+	mat.albedo_color = Color(0.25, 0.55, 1.0)
 	mat.emission_enabled = true
-	mat.emission         = Color(0.1, 0.3, 0.8)
-	_marker.mesh              = cyl
+	mat.emission = Color(0.1, 0.3, 0.8)
+	_marker.mesh = cyl
 	_marker.material_override = mat
-	add_child(_marker)
-	_update_marker_pos()
+	_generated_root.add_child(_marker)
 
 
 func _update_marker_pos() -> void:
+	if _marker == null:
+		return
 	var p := hex_to_world(_unit_col, _unit_row)
 	p.y = 0.3
 	_marker.position = p
 
 
-# ── Movement commands ─────────────────────────────────────────────────────────
+# Movement commands
 
 func _on_move_command(direction: int, steps: int) -> void:
 	if _is_moving:
@@ -287,7 +376,7 @@ func _on_move_command(direction: int, steps: int) -> void:
 			break
 		var t: int = _terrain[nb.y][nb.x]
 		if t == Terrain.MOUNTAIN or t == Terrain.LAKE:
-			break  # stop at boundary, do not enter impassable hex
+			break
 		path.append([nb.x, nb.y])
 		cc = nb.x
 		cr = nb.y
@@ -301,7 +390,6 @@ func _on_pathfind_command(target_col: int, target_row: int) -> void:
 		return
 	var tc := target_col
 	var tr := target_row
-	# If target is impassable, reroute to the nearest passable neighbor of the target
 	if _in_bounds(tc, tr):
 		var t: int = _terrain[tr][tc]
 		if t == Terrain.MOUNTAIN or t == Terrain.LAKE:
@@ -334,7 +422,7 @@ func _execute_next_move() -> void:
 	var nr: int = next[1]
 
 	var travel_time := _travel_time(_unit_col, _unit_row, nc, nr)
-	var target_pos  := hex_to_world(nc, nr)
+	var target_pos := hex_to_world(nc, nr)
 	target_pos.y = 0.3
 
 	var tw := create_tween()
@@ -355,26 +443,25 @@ func _travel_time(fc: int, fr: int, tc: int, tr: int) -> float:
 	var spd := maxf(base_spd, 0.1)
 	var dir := _get_direction(fc, fr, tc, tr)
 	if dir >= 0 and (_roads[fr][fc] & (1 << dir)):
-		spd *= 2.0  # roads are 2× faster
-	# travel time (real seconds) = 40 km / speed (km/h) — 1 game-hour == 1 real-second
+		spd *= 2.0
 	return HEX_DIST_KM / spd
 
 
 func apply_speed_buff(extra_kmh: float, hexes: int) -> void:
-	_speed_buff_kmh   = extra_kmh
+	_speed_buff_kmh = extra_kmh
 	_speed_buff_hexes = hexes
 
 
-# ── A* pathfinding ────────────────────────────────────────────────────────────
+# A* pathfinding
 
 func _astar(fc: int, fr: int, tc: int, tr: int) -> Array:
 	if fc == tc and fr == tr:
 		return []
 	var start := Vector2i(fc, fr)
-	var goal  := Vector2i(tc, tr)
-	var open_set:   Dictionary = {start: _hex_dist(fc, fr, tc, tr) * ASTAR_ROAD}
-	var g_score:    Dictionary = {start: 0.0}
-	var came_from:  Dictionary = {}
+	var goal := Vector2i(tc, tr)
+	var open_set: Dictionary = {start: _hex_dist(fc, fr, tc, tr) * ASTAR_ROAD}
+	var g_score: Dictionary = {start: 0.0}
+	var came_from: Dictionary = {}
 
 	while not open_set.is_empty():
 		var current := _min_f(open_set)
@@ -390,16 +477,15 @@ func _astar(fc: int, fr: int, tc: int, tr: int) -> Array:
 			var nb := get_neighbor(current.x, current.y, dir)
 			if not _in_bounds(nb.x, nb.y):
 				continue
-			# Mountains and lakes excluded from pathfinding (speed reserved as 0 for future)
 			var t: int = _terrain[nb.y][nb.x]
 			if t == Terrain.MOUNTAIN or t == Terrain.LAKE:
 				continue
 			var edge_cost := ASTAR_ROAD if (_roads[current.y][current.x] & (1 << dir)) else ASTAR_GRASS
 			var tg := cur_g + edge_cost
 			if not g_score.has(nb) or tg < g_score[nb]:
-				g_score[nb]   = tg
+				g_score[nb] = tg
 				came_from[nb] = current
-				open_set[nb]  = tg + _hex_dist(nb.x, nb.y, tc, tr) * ASTAR_ROAD
+				open_set[nb] = tg + _hex_dist(nb.x, nb.y, tc, tr) * ASTAR_ROAD
 	return []
 
 
@@ -409,12 +495,11 @@ func _min_f(d: Dictionary) -> Vector2i:
 	for k in d:
 		if d[k] < best_v:
 			best_v = d[k]
-			best   = k
+			best = k
 	return best
 
 
 func _hex_dist(ac: int, ar: int, bc: int, br: int) -> float:
-	# Offset → cube coords (odd-r shift)
 	var aq := ac - (ar - (ar & 1)) / 2
 	var as_ := ar
 	var ay := -aq - as_
@@ -424,11 +509,11 @@ func _hex_dist(ac: int, ar: int, bc: int, br: int) -> float:
 	return max(abs(aq - bq), max(abs(ay - by), abs(as_ - bs)))
 
 
-# ── Map query ─────────────────────────────────────────────────────────────────
+# Map query
 
 func get_position_info() -> String:
 	const TERRAIN_NAMES := ["平地", "山脉", "湖泊"]
-	const DIR_NAMES     := ["东北", "东", "东南", "西南", "西", "西北"]
+	const DIR_NAMES := ["东北", "东", "东南", "西南", "西", "西北"]
 	var cur: String = TERRAIN_NAMES[_terrain[_unit_row][_unit_col]]
 	var road_mask: int = _roads[_unit_row][_unit_col]
 	var info := "部队当前位置：(%d,%d) 地形：%s" % [_unit_col, _unit_row, cur]
@@ -445,18 +530,18 @@ func get_position_info() -> String:
 	return info
 
 
-# ── Tooltip ───────────────────────────────────────────────────────────────────
+# Tooltip
 
 func _create_tooltip() -> void:
-	_tooltip_canvas       = CanvasLayer.new()
+	_tooltip_canvas = CanvasLayer.new()
 	_tooltip_canvas.layer = 20
-	_tooltip              = PanelContainer.new()
-	_tooltip.visible             = false
+	_tooltip = PanelContainer.new()
+	_tooltip.visible = false
 	_tooltip.custom_minimum_size = Vector2(220, 0)
 	_tooltip_canvas.add_child(_tooltip)
 	_tooltip_label = RichTextLabel.new()
-	_tooltip_label.bbcode_enabled      = true
-	_tooltip_label.fit_content         = true
+	_tooltip_label.bbcode_enabled = true
+	_tooltip_label.fit_content = true
 	_tooltip_label.custom_minimum_size = Vector2(210, 0)
 	_tooltip.add_child(_tooltip_label)
 	get_tree().root.add_child(_tooltip_canvas)
