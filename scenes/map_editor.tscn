@@ -75,6 +75,36 @@ text = "Paint"
 layout_mode = 2
 size_flags_horizontal = 3
 
+[node name="ModeRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox"]
+layout_mode = 2
+
+[node name="ModeLabel" type="Label" parent="UILayer/EditorUI/VBox/ModeRow"]
+layout_mode = 2
+text = "Mode"
+
+[node name="ModeOption" type="OptionButton" parent="UILayer/EditorUI/VBox/ModeRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RoadRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox"]
+layout_mode = 2
+
+[node name="RoadOpLabel" type="Label" parent="UILayer/EditorUI/VBox/RoadRow"]
+layout_mode = 2
+text = "Road"
+
+[node name="RoadOpOption" type="OptionButton" parent="UILayer/EditorUI/VBox/RoadRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RoadDirLabel" type="Label" parent="UILayer/EditorUI/VBox/RoadRow"]
+layout_mode = 2
+text = "Dir"
+
+[node name="RoadDirOption" type="OptionButton" parent="UILayer/EditorUI/VBox/RoadRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
 [node name="SaveRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox"]
 layout_mode = 2
 

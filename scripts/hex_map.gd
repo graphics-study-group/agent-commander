@@ -298,6 +298,38 @@ func get_road_mask_at(col: int, row: int) -> int:
 	return int(_roads[row][col])
 
 
+func set_road_at(col: int, row: int, direction: int, enabled: bool) -> bool:
+	if not _in_bounds(col, row):
+		return false
+	if direction < 0 or direction > 5:
+		return false
+	var nb := get_neighbor(col, row, direction)
+	if not _in_bounds(nb.x, nb.y):
+		return false
+	if _is_impassable(_terrain[row][col]) or _is_impassable(_terrain[nb.y][nb.x]):
+		return false
+	var opposite := (direction + 3) % 6
+	var old_mask := int(_roads[row][col])
+	var old_nb_mask := int(_roads[nb.y][nb.x])
+	if enabled:
+		_roads[row][col] = old_mask | (1 << direction)
+		_roads[nb.y][nb.x] = old_nb_mask | (1 << opposite)
+	else:
+		_roads[row][col] = old_mask & ~(1 << direction)
+		_roads[nb.y][nb.x] = old_nb_mask & ~(1 << opposite)
+	if int(_roads[row][col]) == old_mask and int(_roads[nb.y][nb.x]) == old_nb_mask:
+		return false
+	_refresh_tile_and_neighbors(col, row)
+	_refresh_tile_and_neighbors(nb.x, nb.y)
+	return true
+
+
+func get_direction_between(fc: int, fr: int, tc: int, tr: int) -> int:
+	if not _in_bounds(fc, fr) or not _in_bounds(tc, tr):
+		return -1
+	return _get_direction(fc, fr, tc, tr)
+
+
 func set_tile_type_at(col: int, row: int, tile_type: int) -> bool:
 	if not _in_bounds(col, row):
 		return false
