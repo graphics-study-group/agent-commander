@@ -6,6 +6,9 @@
 
 [node name="MountainTile" unique_id=1727156551 instance=ExtResource("1_base_scene")]
 script = ExtResource("2_mountain_script")
+road_hex_radius = 1.0
 road_height = 0.28
+road_width = 0.16
+road_material = null
 
 [node name="tile_022" parent="VisualRoot" index="0" unique_id=1851761279 instance=ExtResource("3_7cf7j")]

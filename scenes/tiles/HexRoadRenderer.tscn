@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://dxrsuo0opf8f"]
+
+[ext_resource type="Script" uid="uid://dr3l1jvxariem" path="res://scripts/tiles/hex_road_renderer.gd" id="1_renderer"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dnrqk"]
+
+[node name="HexRoadRenderer" type="Node3D" unique_id=1364948898]
+script = ExtResource("1_renderer")
+road_material = SubResource("StandardMaterial3D_dnrqk")
+
+[node name="RoadMesh" type="MeshInstance3D" parent="." unique_id=544642718]

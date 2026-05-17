@@ -351,7 +351,7 @@ func _update_marker_pos() -> void:
 	if _marker == null:
 		return
 	var p := hex_to_world(_unit_col, _unit_row)
-	p.y = 0.3
+	p.y = 1.5
 	_marker.position = p
 
 

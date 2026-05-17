@@ -60,6 +60,20 @@ func get_neighbor_road_mask(dir: int) -> int:
 	return int(map_ref.call("get_road_mask_at", nb.x, nb.y))
 
 
+func get_neighbor_types() -> Array:
+	var out: Array = []
+	for dir in range(6):
+		out.append(get_neighbor_tile_type(dir))
+	return out
+
+
+func get_neighbor_road_masks() -> Array:
+	var out: Array = []
+	for dir in range(6):
+		out.append(get_neighbor_road_mask(dir))
+	return out
+
+
 func set_selected(selected: bool) -> void:
 	scale = Vector3.ONE * (1.05 if selected else 1.0)
 
