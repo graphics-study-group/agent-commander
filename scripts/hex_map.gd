@@ -100,9 +100,10 @@ func regenerate_map(cols: int, rows: int, all_plain: bool = false) -> void:
 	_grid_rows = maxi(rows, 1)
 	if all_plain:
 		_generate_plain_terrain()
+		_generate_empty_roads()
 	else:
 		_generate_terrain()
-	_generate_roads()
+		_generate_roads()
 	_find_start_pos()
 	_rebuild_visuals()
 
@@ -263,6 +264,15 @@ func _generate_roads() -> void:
 			continue
 		_roads[row][col] |= (1 << dir)
 		_roads[nb.y][nb.x] |= (1 << ((dir + 3) % 6))
+
+
+func _generate_empty_roads() -> void:
+	_roads.resize(_grid_rows)
+	for r in range(_grid_rows):
+		_roads[r] = []
+		_roads[r].resize(_grid_cols)
+		for c in range(_grid_cols):
+			_roads[r][c] = 0
 
 
 func _is_impassable(tile_type: int) -> bool:
