@@ -92,9 +92,16 @@ func _init_refs() -> void:
 
 
 func regenerate_random_map() -> void:
-	_grid_cols = GRID_COLS
-	_grid_rows = GRID_ROWS
-	_generate_terrain()
+	regenerate_map(GRID_COLS, GRID_ROWS, false)
+
+
+func regenerate_map(cols: int, rows: int, all_plain: bool = false) -> void:
+	_grid_cols = maxi(cols, 1)
+	_grid_rows = maxi(rows, 1)
+	if all_plain:
+		_generate_plain_terrain()
+	else:
+		_generate_terrain()
 	_generate_roads()
 	_find_start_pos()
 	_rebuild_visuals()
@@ -213,6 +220,15 @@ func _generate_terrain() -> void:
 				_terrain[r][c] = Terrain.CITY
 
 
+func _generate_plain_terrain() -> void:
+	_terrain.resize(_grid_rows)
+	for r in range(_grid_rows):
+		_terrain[r] = []
+		_terrain[r].resize(_grid_cols)
+		for c in range(_grid_cols):
+			_terrain[r][c] = Terrain.PLAIN
+
+
 func _find_start_pos() -> void:
 	var best_dist := INF
 	for r in range(_grid_rows):
@@ -282,6 +298,25 @@ func get_road_mask_at(col: int, row: int) -> int:
 	return int(_roads[row][col])
 
 
+func set_tile_type_at(col: int, row: int, tile_type: int) -> bool:
+	if not _in_bounds(col, row):
+		return false
+	var normalized_type := clampi(tile_type, Terrain.PLAIN, Terrain.CITY)
+	if int(_terrain[row][col]) == normalized_type:
+		return false
+	_terrain[row][col] = normalized_type
+	if _is_impassable(_terrain[_unit_row][_unit_col]):
+		_find_start_pos()
+		_update_marker_pos()
+	_replace_tile_node(col, row)
+	_refresh_tile_and_neighbors(col, row)
+	return true
+
+
+func get_map_size() -> Vector2i:
+	return Vector2i(_grid_cols, _grid_rows)
+
+
 func _get_direction(fc: int, fr: int, tc: int, tr: int) -> int:
 	var off: Array = OFFSETS_ODD if fr % 2 == 1 else OFFSETS_EVEN
 	for d in range(6):
@@ -319,6 +354,42 @@ func _generate_tiles() -> void:
 			tile.configure(col, row, _terrain[row][col], _roads[row][col], self)
 			_tile_nodes[row][col] = tile
 			_generated_root.add_child(tile)
+
+
+func _replace_tile_node(col: int, row: int) -> void:
+	if not _in_bounds(col, row):
+		return
+	if row >= _tile_nodes.size():
+		return
+	var row_data := _tile_nodes[row] as Array
+	if col >= row_data.size():
+		return
+	var existing := row_data[col] as TileBase
+	if is_instance_valid(existing):
+		existing.queue_free()
+	var tile_scene := _get_tile_scene(_terrain[row][col])
+	var tile := tile_scene.instantiate() as TileBase
+	if tile == null:
+		return
+	tile.position = hex_to_world(col, row)
+	tile.configure(col, row, _terrain[row][col], _roads[row][col], self)
+	row_data[col] = tile
+	_tile_nodes[row] = row_data
+	_generated_root.add_child(tile)
+
+
+func _refresh_tile_and_neighbors(col: int, row: int) -> void:
+	_refresh_tile_config(col, row)
+	for dir in range(6):
+		var nb := get_neighbor(col, row, dir)
+		_refresh_tile_config(nb.x, nb.y)
+
+
+func _refresh_tile_config(col: int, row: int) -> void:
+	var tile := _get_tile_node(col, row)
+	if tile == null:
+		return
+	tile.configure(col, row, _terrain[row][col], _roads[row][col], self)
 
 
 func _get_tile_node(col: int, row: int) -> TileBase:

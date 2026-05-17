@@ -5,6 +5,10 @@
 [ext_resource type="PackedScene" uid="uid://catc7sox5nvrt" path="res://scenes/tiles/CityTileModel.tscn" id="3_nrk36"]
 [ext_resource type="PackedScene" uid="uid://dxrsuo0opf8f" path="res://scenes/tiles/HexRoadRenderer.tscn" id="4_renderer"]
 
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_u45x7"]
+height = 1.0
+radius = 0.85
+
 [node name="CityTile" unique_id=1776603722 instance=ExtResource("1_base_scene")]
 script = ExtResource("2_city_script")
 road_hex_radius = 1.0
@@ -14,3 +18,9 @@ road_width = 0.16
 [node name="tile_012" parent="VisualRoot" index="0" unique_id=56018346 instance=ExtResource("3_nrk36")]
 
 [node name="RoadRenderer" parent="VisualRoot" index="1" unique_id=1520550834 instance=ExtResource("4_renderer")]
+
+[node name="Area3D" type="Area3D" parent="." index="1" unique_id=2088447422]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D" index="0" unique_id=1702795293]
+shape = SubResource("CylinderShape3D_u45x7")

@@ -4,11 +4,21 @@
 [ext_resource type="Script" uid="uid://b57fk2276s2na" path="res://scripts/tiles/mountain_tile.gd" id="2_mountain_script"]
 [ext_resource type="PackedScene" uid="uid://roiqrlx7ech" path="res://scenes/tiles/MountainTileModel.tscn" id="3_7cf7j"]
 
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_7cf7j"]
+height = 1.0
+radius = 0.6
+
 [node name="MountainTile" unique_id=1727156551 instance=ExtResource("1_base_scene")]
 script = ExtResource("2_mountain_script")
-road_hex_radius = 1.0
-road_height = 0.28
-road_width = 0.16
-road_material = null
 
 [node name="tile_022" parent="VisualRoot" index="0" unique_id=1851761279 instance=ExtResource("3_7cf7j")]
+
+[node name="Area3D" type="Area3D" parent="." index="1" unique_id=134629930]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D" index="0" unique_id=1986482694]
+shape = SubResource("CylinderShape3D_7cf7j")
+
+[node name="CollisionShape3D2" type="CollisionShape3D" parent="Area3D" index="1" unique_id=1666717047]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+shape = SubResource("CylinderShape3D_7cf7j")

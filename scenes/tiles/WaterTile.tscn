@@ -4,11 +4,17 @@
 [ext_resource type="Script" uid="uid://b8ovmstxsolws" path="res://scripts/tiles/water_tile.gd" id="2_water_script"]
 [ext_resource type="PackedScene" uid="uid://brgds5xas64iy" path="res://scenes/tiles/WaterTileModel.tscn" id="3_3wki5"]
 
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_3wki5"]
+height = 1.0
+radius = 0.85
+
 [node name="WaterTile" unique_id=1029244498 instance=ExtResource("1_base_scene")]
 script = ExtResource("2_water_script")
-road_hex_radius = 1.0
-road_height = 0.28
-road_width = 0.16
-road_material = null
 
 [node name="tile_072" parent="VisualRoot" index="0" unique_id=1443011565 instance=ExtResource("3_3wki5")]
+
+[node name="Area3D" type="Area3D" parent="." index="1" unique_id=448937406]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D" index="0" unique_id=2141056239]
+shape = SubResource("CylinderShape3D_3wki5")

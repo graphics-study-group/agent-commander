@@ -13,8 +13,19 @@ func _ready() -> void:
 		push_warning("HexagonalMap node has no load_map_from_path API.")
 		return
 
-	var ok: bool = _hex_map.load_map_from_path(MAP_PATH)
+	var map_path := _resolve_map_path()
+	var ok: bool = _hex_map.load_map_from_path(map_path)
 	if not ok:
-		push_warning("Failed to load map from %s, fallback random map is used." % MAP_PATH)
+		push_warning("Failed to load map from %s, fallback random map is used." % map_path)
 		if _hex_map.has_method("regenerate_random_map"):
 			_hex_map.regenerate_random_map()
+
+
+func _resolve_map_path() -> String:
+	var app_state := get_node_or_null("/root/AppState")
+	if app_state == null:
+		return MAP_PATH
+	var selected := String(app_state.get("selected_map_path"))
+	if selected.is_empty():
+		return MAP_PATH
+	return selected

@@ -21,24 +21,75 @@ layer = 2
 [node name="EditorUI" type="PanelContainer" parent="UILayer"]
 anchors_preset = 1
 anchor_left = 1.0
-offset_left = -320.0
+offset_left = -360.0
 offset_right = -16.0
-offset_bottom = 180.0
+offset_bottom = 280.0
 
 [node name="VBox" type="VBoxContainer" parent="UILayer/EditorUI"]
 layout_mode = 2
+theme_override_constants/separation = 8
 
 [node name="Title" type="Label" parent="UILayer/EditorUI/VBox"]
 layout_mode = 2
 text = "Map Editor"
 
+[node name="SizeRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox"]
+layout_mode = 2
+
+[node name="ColsLabel" type="Label" parent="UILayer/EditorUI/VBox/SizeRow"]
+layout_mode = 2
+text = "Cols"
+
+[node name="ColsSpin" type="SpinBox" parent="UILayer/EditorUI/VBox/SizeRow"]
+layout_mode = 2
+min_value = 4.0
+max_value = 128.0
+value = 16.0
+
+[node name="RowsLabel" type="Label" parent="UILayer/EditorUI/VBox/SizeRow"]
+layout_mode = 2
+text = "Rows"
+
+[node name="RowsSpin" type="SpinBox" parent="UILayer/EditorUI/VBox/SizeRow"]
+layout_mode = 2
+min_value = 4.0
+max_value = 128.0
+value = 16.0
+
+[node name="AllPlainCheck" type="CheckBox" parent="UILayer/EditorUI/VBox"]
+layout_mode = 2
+text = "Generate all plain"
+
 [node name="GenerateButton" type="Button" parent="UILayer/EditorUI/VBox"]
 layout_mode = 2
 text = "Generate Random"
 
+[node name="PaintRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox"]
+layout_mode = 2
+
+[node name="PaintLabel" type="Label" parent="UILayer/EditorUI/VBox/PaintRow"]
+layout_mode = 2
+text = "Paint"
+
+[node name="TerrainOption" type="OptionButton" parent="UILayer/EditorUI/VBox/PaintRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SaveRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox"]
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="UILayer/EditorUI/VBox/SaveRow"]
+layout_mode = 2
+text = "Name"
+
+[node name="NameEdit" type="LineEdit" parent="UILayer/EditorUI/VBox/SaveRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "new_map"
+
 [node name="SaveButton" type="Button" parent="UILayer/EditorUI/VBox"]
 layout_mode = 2
-text = "Save Map"
+text = "Save Map (user://maps)"
 
 [node name="StatusLabel" type="Label" parent="UILayer/EditorUI/VBox"]
 layout_mode = 2

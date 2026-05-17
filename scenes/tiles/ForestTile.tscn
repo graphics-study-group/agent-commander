@@ -5,6 +5,10 @@
 [ext_resource type="PackedScene" uid="uid://dyvb42midiuk0" path="res://scenes/tiles/ForestTileModel.tscn" id="3_icwls"]
 [ext_resource type="PackedScene" uid="uid://dxrsuo0opf8f" path="res://scenes/tiles/HexRoadRenderer.tscn" id="4_renderer"]
 
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_r7a52"]
+height = 1.0
+radius = 0.85
+
 [node name="ForestTile" unique_id=2106104201 instance=ExtResource("1_base_scene")]
 script = ExtResource("2_forest_script")
 road_hex_radius = 1.0
@@ -14,3 +18,9 @@ road_width = 0.16
 [node name="RoadRenderer" parent="VisualRoot" index="0" unique_id=1880079686 instance=ExtResource("4_renderer")]
 
 [node name="tile_052" parent="." index="1" unique_id=421846762 instance=ExtResource("3_icwls")]
+
+[node name="Area3D" type="Area3D" parent="." index="2" unique_id=326921480]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D" index="0" unique_id=1790716341]
+shape = SubResource("CylinderShape3D_r7a52")
