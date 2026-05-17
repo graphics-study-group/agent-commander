@@ -1,7 +1,11 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://nexr8wtpu10u"]
 
 [ext_resource type="PackedScene" path="res://scenes/tiles/TileBase.tscn" id="1_base_scene"]
-[ext_resource type="Script" path="res://scripts/tiles/mountain_tile.gd" id="2_mountain_script"]
+[ext_resource type="Script" uid="uid://b57fk2276s2na" path="res://scripts/tiles/mountain_tile.gd" id="2_mountain_script"]
+[ext_resource type="PackedScene" uid="uid://roiqrlx7ech" path="res://scenes/tiles/MountainTileModel.tscn" id="3_7cf7j"]
 
-[node name="MountainTile" instance=ExtResource("1_base_scene")]
+[node name="MountainTile" unique_id=1727156551 instance=ExtResource("1_base_scene")]
 script = ExtResource("2_mountain_script")
+road_height = 0.28
+
+[node name="tile_022" parent="VisualRoot" index="0" unique_id=1851761279 instance=ExtResource("3_7cf7j")]

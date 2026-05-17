@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://brgds5xas64iy"]
+
+[ext_resource type="PackedScene" uid="uid://bnbbub0vwxrhw" path="res://assets/tile_07.glb" id="1_4edvi"]
+
+[node name="tile_072" unique_id=1443011565 instance=ExtResource("1_4edvi")]
+
+[node name="tile_07" parent="." index="0" unique_id=113904259]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 0, 0)

@@ -1,7 +1,11 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://dpcn2rdb21rc2"]
 
 [ext_resource type="PackedScene" path="res://scenes/tiles/TileBase.tscn" id="1_base_scene"]
-[ext_resource type="Script" path="res://scripts/tiles/water_tile.gd" id="2_water_script"]
+[ext_resource type="Script" uid="uid://b8ovmstxsolws" path="res://scripts/tiles/water_tile.gd" id="2_water_script"]
+[ext_resource type="PackedScene" uid="uid://brgds5xas64iy" path="res://scenes/tiles/WaterTileModel.tscn" id="3_3wki5"]
 
-[node name="WaterTile" instance=ExtResource("1_base_scene")]
+[node name="WaterTile" unique_id=1029244498 instance=ExtResource("1_base_scene")]
 script = ExtResource("2_water_script")
+road_height = 0.28
+
+[node name="tile_072" parent="VisualRoot" index="0" unique_id=1443011565 instance=ExtResource("3_3wki5")]

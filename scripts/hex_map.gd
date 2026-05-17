@@ -2,9 +2,9 @@ extends Node3D
 
 const GRID_COLS := 16
 const GRID_ROWS := 16
-const H_STEP := 0.866
-const V_STEP := 0.75
-const ROW_OFFSET := 0.433
+const H_STEP := 1.732
+const V_STEP := 1.5
+const ROW_OFFSET := 0.866
 
 const HEX_DIST_KM := 40.0
 const ASTAR_GRASS := 10.0

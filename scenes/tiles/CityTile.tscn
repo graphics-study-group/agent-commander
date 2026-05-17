@@ -1,7 +1,11 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://csnjplxhqdcqc"]
 
 [ext_resource type="PackedScene" path="res://scenes/tiles/TileBase.tscn" id="1_base_scene"]
-[ext_resource type="Script" path="res://scripts/tiles/city_tile.gd" id="2_city_script"]
+[ext_resource type="Script" uid="uid://bwn6x5b2faw0e" path="res://scripts/tiles/city_tile.gd" id="2_city_script"]
+[ext_resource type="PackedScene" uid="uid://catc7sox5nvrt" path="res://scenes/tiles/CityTileModel.tscn" id="3_nrk36"]
 
-[node name="CityTile" instance=ExtResource("1_base_scene")]
+[node name="CityTile" unique_id=1776603722 instance=ExtResource("1_base_scene")]
 script = ExtResource("2_city_script")
+road_height = 0.28
+
+[node name="tile_012" parent="VisualRoot" index="0" unique_id=56018346 instance=ExtResource("3_nrk36")]

@@ -1,7 +1,11 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://rqe4r8tqs2jy"]
 
 [ext_resource type="PackedScene" path="res://scenes/tiles/TileBase.tscn" id="1_base_scene"]
-[ext_resource type="Script" path="res://scripts/tiles/plain_tile.gd" id="2_plain_script"]
+[ext_resource type="Script" uid="uid://m66n3pdoifvk" path="res://scripts/tiles/plain_tile.gd" id="2_plain_script"]
+[ext_resource type="PackedScene" uid="uid://dr6yhjg6rubr5" path="res://scenes/tiles/PlainTileModel.tscn" id="3_ko83r"]
 
-[node name="PlainTile" instance=ExtResource("1_base_scene")]
+[node name="PlainTile" unique_id=761313562 instance=ExtResource("1_base_scene")]
 script = ExtResource("2_plain_script")
+road_height = 0.28
+
+[node name="HexagonalPrism2" parent="VisualRoot" index="0" unique_id=977229547 instance=ExtResource("3_ko83r")]
