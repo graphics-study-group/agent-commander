@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/tiles/TileBase.tscn" id="1_base_scene"]
+[ext_resource type="Script" path="res://scripts/tiles/mountain_tile.gd" id="2_mountain_script"]
+
+[node name="MountainTile" instance=ExtResource("1_base_scene")]
+script = ExtResource("2_mountain_script")

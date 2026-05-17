@@ -1,7 +1,5 @@
 extends Node3D
 
-const TILE_SCENE_PATH := "res://assets/HexagonalPrism.glb"
-const TILE_SCALE := 0.97
 const GRID_COLS := 16
 const GRID_ROWS := 16
 const H_STEP := 0.866
@@ -12,10 +10,16 @@ const HEX_DIST_KM := 40.0
 const ASTAR_GRASS := 10.0
 const ASTAR_ROAD := 5.0
 
-enum Terrain { GRASSLAND, MOUNTAIN, LAKE }
+enum Terrain { PLAIN, FOREST, MOUNTAIN, WATER, CITY }
 
 const OFFSETS_EVEN := [[0, -1], [1, 0], [0, 1], [-1, 1], [-1, 0], [-1, -1]]
 const OFFSETS_ODD := [[1, -1], [1, 0], [1, 1], [0, 1], [-1, 0], [0, -1]]
+
+const TILE_SCENE_PLAIN := preload("res://scenes/tiles/PlainTile.tscn")
+const TILE_SCENE_FOREST := preload("res://scenes/tiles/ForestTile.tscn")
+const TILE_SCENE_MOUNTAIN := preload("res://scenes/tiles/MountainTile.tscn")
+const TILE_SCENE_WATER := preload("res://scenes/tiles/WaterTile.tscn")
+const TILE_SCENE_CITY := preload("res://scenes/tiles/CityTile.tscn")
 
 @export var auto_generate_on_ready := true
 @export_file("*.tres", "*.res") var startup_map_path := ""
@@ -24,6 +28,7 @@ var _grid_cols := GRID_COLS
 var _grid_rows := GRID_ROWS
 var _terrain: Array = []
 var _roads: Array = []
+var _tile_nodes: Array = []
 
 var _unit: Unit
 var _unit_col := 8
@@ -116,12 +121,14 @@ func load_map_data(data: MapData) -> bool:
 
 	_grid_cols = data.cols
 	_grid_rows = data.rows
-	_terrain = _copy_grid(data.terrain)
 	_roads = _copy_grid(data.roads)
+
+	var legacy_terrain := data.tile_types.is_empty() and data.version <= 1
+	_terrain = _normalize_tile_grid(data.get_tile_types_grid(), legacy_terrain)
+
 	_unit_col = data.spawn_col
 	_unit_row = data.spawn_row
-
-	if _terrain[_unit_row][_unit_col] != Terrain.GRASSLAND:
+	if _is_impassable(_terrain[_unit_row][_unit_col]):
 		_find_start_pos()
 
 	_rebuild_visuals()
@@ -130,10 +137,10 @@ func load_map_data(data: MapData) -> bool:
 
 func export_map_data() -> MapData:
 	var data := MapData.new()
-	data.version = 1
+	data.version = 2
 	data.cols = _grid_cols
 	data.rows = _grid_rows
-	data.terrain = _copy_grid(_terrain)
+	data.set_tile_types_grid(_terrain)
 	data.roads = _copy_grid(_roads)
 	data.spawn_col = _unit_col
 	data.spawn_row = _unit_row
@@ -147,10 +154,33 @@ func _copy_grid(src: Array) -> Array:
 	return out
 
 
+func _normalize_tile_grid(src: Array, legacy_terrain: bool) -> Array:
+	var out: Array = []
+	for row in src:
+		var converted_row: Array = []
+		for raw_value in row:
+			converted_row.append(_normalize_tile_value(int(raw_value), legacy_terrain))
+		out.append(converted_row)
+	return out
+
+
+func _normalize_tile_value(v: int, legacy_terrain: bool) -> int:
+	if legacy_terrain:
+		match v:
+			0:
+				return Terrain.PLAIN
+			1:
+				return Terrain.MOUNTAIN
+			2:
+				return Terrain.WATER
+			_:
+				return Terrain.PLAIN
+	return clamp(v, 0, 4)
+
+
 func _rebuild_visuals() -> void:
 	_clear_generated_root()
-	_generate_grid()
-	_draw_roads()
+	_generate_tiles()
 	_create_marker()
 	_update_marker_pos()
 
@@ -161,9 +191,8 @@ func _clear_generated_root() -> void:
 	_generated_root = Node3D.new()
 	_generated_root.name = "GeneratedMap"
 	add_child(_generated_root)
+	_tile_nodes = []
 
-
-# Terrain and road generation
 
 func _generate_terrain() -> void:
 	_terrain.resize(_grid_rows)
@@ -172,19 +201,23 @@ func _generate_terrain() -> void:
 		_terrain[r].resize(_grid_cols)
 		for c in range(_grid_cols):
 			var v := randf()
-			if v < 0.15:
+			if v < 0.52:
+				_terrain[r][c] = Terrain.PLAIN
+			elif v < 0.74:
+				_terrain[r][c] = Terrain.FOREST
+			elif v < 0.86:
 				_terrain[r][c] = Terrain.MOUNTAIN
-			elif v < 0.30:
-				_terrain[r][c] = Terrain.LAKE
+			elif v < 0.96:
+				_terrain[r][c] = Terrain.WATER
 			else:
-				_terrain[r][c] = Terrain.GRASSLAND
+				_terrain[r][c] = Terrain.CITY
 
 
 func _find_start_pos() -> void:
 	var best_dist := INF
 	for r in range(_grid_rows):
 		for c in range(_grid_cols):
-			if _terrain[r][c] == Terrain.GRASSLAND:
+			if not _is_impassable(_terrain[r][c]):
 				var d := _hex_dist(c, r, _grid_cols / 2, _grid_rows / 2)
 				if d < best_dist:
 					best_dist = d
@@ -204,19 +237,21 @@ func _generate_roads() -> void:
 	for _i in range(attempts):
 		var col := randi() % _grid_cols
 		var row := randi() % _grid_rows
-		if _terrain[row][col] != Terrain.GRASSLAND:
+		if _is_impassable(_terrain[row][col]):
 			continue
 		var dir := randi() % 6
 		var nb := get_neighbor(col, row, dir)
 		if not _in_bounds(nb.x, nb.y):
 			continue
-		if _terrain[nb.y][nb.x] != Terrain.GRASSLAND:
+		if _is_impassable(_terrain[nb.y][nb.x]):
 			continue
 		_roads[row][col] |= (1 << dir)
 		_roads[nb.y][nb.x] |= (1 << ((dir + 3) % 6))
 
 
-# Hex geometry
+func _is_impassable(tile_type: int) -> bool:
+	return tile_type == Terrain.MOUNTAIN or tile_type == Terrain.WATER
+
 
 func hex_to_world(col: int, row: int) -> Vector3:
 	var cx := (_grid_cols - 1) * H_STEP * 0.5
@@ -244,100 +279,46 @@ func _get_direction(fc: int, fr: int, tc: int, tr: int) -> int:
 	return -1
 
 
-# Grid rendering
+func _get_tile_scene(tile_type: int) -> PackedScene:
+	match tile_type:
+		Terrain.FOREST:
+			return TILE_SCENE_FOREST
+		Terrain.MOUNTAIN:
+			return TILE_SCENE_MOUNTAIN
+		Terrain.WATER:
+			return TILE_SCENE_WATER
+		Terrain.CITY:
+			return TILE_SCENE_CITY
+		_:
+			return TILE_SCENE_PLAIN
 
-func _generate_grid() -> void:
-	var tile_scene := load(TILE_SCENE_PATH) as PackedScene
-	var mat_grass := _solid_mat(Color(0.35, 0.65, 0.25))
-	var mat_mountain := _solid_mat(Color(0.52, 0.40, 0.28))
-	var mat_lake := _solid_mat(Color(0.20, 0.45, 0.85))
 
+func _generate_tiles() -> void:
+	_tile_nodes.resize(_grid_rows)
 	for row in range(_grid_rows):
+		_tile_nodes[row] = []
+		_tile_nodes[row].resize(_grid_cols)
 		for col in range(_grid_cols):
-			var tile := tile_scene.instantiate()
+			var tile_scene := _get_tile_scene(_terrain[row][col])
+			var tile := tile_scene.instantiate() as TileBase
+			if tile == null:
+				continue
 			tile.position = hex_to_world(col, row)
-			tile.scale = Vector3.ONE * TILE_SCALE
-			match _terrain[row][col]:
-				Terrain.MOUNTAIN:
-					_set_mat_recursive(tile, mat_mountain)
-				Terrain.LAKE:
-					_set_mat_recursive(tile, mat_lake)
-				_:
-					_set_mat_recursive(tile, mat_grass)
+			tile.configure(col, row, _terrain[row][col], _roads[row][col])
+			_tile_nodes[row][col] = tile
 			_generated_root.add_child(tile)
 
 
-func _solid_mat(color: Color) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.albedo_color = color
-	return m
+func _get_tile_node(col: int, row: int) -> TileBase:
+	if not _in_bounds(col, row):
+		return null
+	if row >= _tile_nodes.size():
+		return null
+	var row_data := _tile_nodes[row] as Array
+	if col >= row_data.size():
+		return null
+	return row_data[col] as TileBase
 
-
-func _set_mat_recursive(node: Node, mat: Material) -> void:
-	if node is MeshInstance3D:
-		(node as MeshInstance3D).material_override = mat
-	for child in node.get_children():
-		_set_mat_recursive(child, mat)
-
-
-# Road rendering
-
-func _draw_roads() -> void:
-	var verts := PackedVector3Array()
-	var indices := PackedInt32Array()
-	var idx := 0
-	const ROAD_W := 0.08
-
-	for row in range(_grid_rows):
-		for col in range(_grid_cols):
-			var mask: int = _roads[row][col]
-			if mask == 0:
-				continue
-			var center := hex_to_world(col, row)
-			center.y = 0.28
-			for dir in range(6):
-				if not (mask & (1 << dir)):
-					continue
-				var nb := get_neighbor(col, row, dir)
-				if not _in_bounds(nb.x, nb.y):
-					continue
-				var nb_world := hex_to_world(nb.x, nb.y)
-				nb_world.y = 0.28
-				var edge_mid := (center + nb_world) * 0.5
-				var seg_dir := (edge_mid - center).normalized()
-				var perp := Vector3(seg_dir.z, 0.0, -seg_dir.x) * (ROAD_W * 0.5)
-
-				verts.append(center - perp)
-				verts.append(center + perp)
-				verts.append(edge_mid + perp)
-				verts.append(edge_mid - perp)
-				indices.append(idx)
-				indices.append(idx + 1)
-				indices.append(idx + 2)
-				indices.append(idx)
-				indices.append(idx + 2)
-				indices.append(idx + 3)
-				idx += 4
-
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_INDEX] = indices
-
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.55, 0.55, 0.55)
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.no_depth_test = true
-	mi.material_override = mat
-	_generated_root.add_child(mi)
-
-
-# Unit marker
 
 func _create_marker() -> void:
 	_marker = MeshInstance3D.new()
@@ -362,8 +343,6 @@ func _update_marker_pos() -> void:
 	_marker.position = p
 
 
-# Movement commands
-
 func _on_move_command(direction: int, steps: int) -> void:
 	if _is_moving:
 		return
@@ -374,8 +353,7 @@ func _on_move_command(direction: int, steps: int) -> void:
 		var nb := get_neighbor(cc, cr, direction)
 		if not _in_bounds(nb.x, nb.y):
 			break
-		var t: int = _terrain[nb.y][nb.x]
-		if t == Terrain.MOUNTAIN or t == Terrain.LAKE:
+		if _is_impassable(_terrain[nb.y][nb.x]):
 			break
 		path.append([nb.x, nb.y])
 		cc = nb.x
@@ -390,22 +368,20 @@ func _on_pathfind_command(target_col: int, target_row: int) -> void:
 		return
 	var tc := target_col
 	var tr := target_row
-	if _in_bounds(tc, tr):
-		var t: int = _terrain[tr][tc]
-		if t == Terrain.MOUNTAIN or t == Terrain.LAKE:
-			var best := Vector2i(-1, -1)
-			var best_dist := INF
-			for dir in range(6):
-				var nb := get_neighbor(tc, tr, dir)
-				if _in_bounds(nb.x, nb.y) and _terrain[nb.y][nb.x] == Terrain.GRASSLAND:
-					var d := _hex_dist(nb.x, nb.y, _unit_col, _unit_row)
-					if d < best_dist:
-						best_dist = d
-						best = nb
-			if best.x < 0:
-				return
-			tc = best.x
-			tr = best.y
+	if _in_bounds(tc, tr) and _is_impassable(_terrain[tr][tc]):
+		var best := Vector2i(-1, -1)
+		var best_dist := INF
+		for dir in range(6):
+			var nb := get_neighbor(tc, tr, dir)
+			if _in_bounds(nb.x, nb.y) and not _is_impassable(_terrain[nb.y][nb.x]):
+				var d := _hex_dist(nb.x, nb.y, _unit_col, _unit_row)
+				if d < best_dist:
+					best_dist = d
+					best = nb
+		if best.x < 0:
+			return
+		tc = best.x
+		tr = best.y
 	var path := _astar(_unit_col, _unit_row, tc, tr)
 	if not path.is_empty():
 		_move_queue = path
@@ -420,6 +396,13 @@ func _execute_next_move() -> void:
 	var next := _move_queue.pop_front() as Array
 	var nc: int = next[0]
 	var nr: int = next[1]
+
+	var from_tile := _get_tile_node(_unit_col, _unit_row)
+	var to_tile := _get_tile_node(nc, nr)
+	if from_tile != null and _unit != null:
+		from_tile.on_unit_leave(_unit)
+	if to_tile != null and _unit != null:
+		to_tile.on_unit_enter(_unit)
 
 	var travel_time := _travel_time(_unit_col, _unit_row, nc, nr)
 	var target_pos := hex_to_world(nc, nr)
@@ -452,8 +435,6 @@ func apply_speed_buff(extra_kmh: float, hexes: int) -> void:
 	_speed_buff_hexes = hexes
 
 
-# A* pathfinding
-
 func _astar(fc: int, fr: int, tc: int, tr: int) -> Array:
 	if fc == tc and fr == tr:
 		return []
@@ -477,8 +458,7 @@ func _astar(fc: int, fr: int, tc: int, tr: int) -> Array:
 			var nb := get_neighbor(current.x, current.y, dir)
 			if not _in_bounds(nb.x, nb.y):
 				continue
-			var t: int = _terrain[nb.y][nb.x]
-			if t == Terrain.MOUNTAIN or t == Terrain.LAKE:
+			if _is_impassable(_terrain[nb.y][nb.x]):
 				continue
 			var edge_cost := ASTAR_ROAD if (_roads[current.y][current.x] & (1 << dir)) else ASTAR_GRASS
 			var tg := cur_g + edge_cost
@@ -509,14 +489,12 @@ func _hex_dist(ac: int, ar: int, bc: int, br: int) -> float:
 	return max(abs(aq - bq), max(abs(ay - by), abs(as_ - bs)))
 
 
-# Map query
-
 func get_position_info() -> String:
-	const TERRAIN_NAMES := ["平地", "山脉", "湖泊"]
+	const TERRAIN_NAMES := ["平原", "树林", "山地", "水域", "城市"]
 	const DIR_NAMES := ["东北", "东", "东南", "西南", "西", "西北"]
 	var cur: String = TERRAIN_NAMES[_terrain[_unit_row][_unit_col]]
 	var road_mask: int = _roads[_unit_row][_unit_col]
-	var info := "部队当前位置：(%d,%d) 地形：%s" % [_unit_col, _unit_row, cur]
+	var info := "部队当前位置：(%d,%d) 地块：%s" % [_unit_col, _unit_row, cur]
 	var neighbors: Array[String] = []
 	for d in range(6):
 		var nb := get_neighbor(_unit_col, _unit_row, d)
@@ -529,8 +507,6 @@ func get_position_info() -> String:
 	info += "\n相邻格：" + ", ".join(neighbors)
 	return info
 
-
-# Tooltip
 
 func _create_tooltip() -> void:
 	_tooltip_canvas = CanvasLayer.new()

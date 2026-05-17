@@ -29,6 +29,18 @@
 - 地图数据类型：`MapData`（`res://scripts/map_data.gd`）
 - 默认地图文件：`res://maps/default_map.tres`
 - 编辑器另存一份到：`user://maps/default_map.tres`
+- 地块架构：`TileBase` 基类场景 + 派生地块场景（Plain / Forest / Mountain / Water / City）
+
+### 地块系统
+
+- 基类地块：`res://scenes/tiles/TileBase.tscn` + `res://scripts/tiles/tile_base.gd`
+- 预留地块类型：
+   - 平原：`res://scenes/tiles/PlainTile.tscn`
+   - 树林：`res://scenes/tiles/ForestTile.tscn`
+   - 山地：`res://scenes/tiles/MountainTile.tscn`
+   - 水域：`res://scenes/tiles/WaterTile.tscn`
+   - 城市：`res://scenes/tiles/CityTile.tscn`
+- 道路数据与地块类型分离保存，单个地块可携带道路 bitmask，并在地块节点上绘制道路覆盖层。
 
 ### 编辑器流程
 

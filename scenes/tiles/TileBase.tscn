@@ -1,0 +1,8 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/tiles/tile_base.gd" id="1_base"]
+
+[node name="TileBase" type="Node3D"]
+script = ExtResource("1_base")
+
+[node name="VisualRoot" type="Node3D" parent="."]
