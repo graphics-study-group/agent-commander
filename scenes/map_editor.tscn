@@ -15,6 +15,14 @@ script = ExtResource("3_hex")
 
 [node name="CameraRoot" parent="." instance=ExtResource("2_cam")]
 
+[node name="HighlightRoot" type="Node3D" parent="."]
+
+[node name="TileHighlight" type="MeshInstance3D" parent="HighlightRoot"]
+visible = false
+
+[node name="LinkHighlight" type="MeshInstance3D" parent="HighlightRoot"]
+visible = false
+
 [node name="UILayer" type="CanvasLayer" parent="."]
 layer = 2
 

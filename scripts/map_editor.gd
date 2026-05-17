@@ -2,6 +2,12 @@ extends Node3D
 
 const USER_MAP_DIR := "user://maps"
 const INVALID_FILE_CHARS := ["\\", "/", ":", "*", "?", "\"", "<", ">", "|"]
+const IMPASSABLE_MOUNTAIN := 2
+const IMPASSABLE_WATER := 3
+const TILE_HIGHLIGHT_Y := 1.03
+const LINK_HIGHLIGHT_Y := 1.05
+const HOVER_ALPHA := 0.24
+const DRAG_ALPHA := 0.42
 
 const TERRAIN_OPTIONS := [
 	{"id": 0, "label": "Plain"},
@@ -39,9 +45,15 @@ const ROAD_DIR_OPTIONS := [
 @onready var _road_row: HBoxContainer = $UILayer/EditorUI/VBox/RoadRow
 @onready var _road_op_option: OptionButton = $UILayer/EditorUI/VBox/RoadRow/RoadOpOption
 @onready var _road_dir_option: OptionButton = $UILayer/EditorUI/VBox/RoadRow/RoadDirOption
+@onready var _tile_highlight: MeshInstance3D = $HighlightRoot/TileHighlight
+@onready var _link_highlight: MeshInstance3D = $HighlightRoot/LinkHighlight
 
 var _is_painting := false
 var _last_painted := Vector2i(-1, -1)
+var _hover_coord := Vector2i(-1, -1)
+var _hover_tile: TileBase
+var _tile_highlight_material: StandardMaterial3D
+var _link_highlight_material: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -54,6 +66,7 @@ func _ready() -> void:
 	_populate_terrain_options()
 	_populate_mode_options()
 	_populate_road_options()
+	_setup_highlight_meshes()
 	_on_generate_pressed()
 
 
@@ -65,6 +78,7 @@ func _on_generate_pressed() -> void:
 		_hex_map.regenerate_map(cols, rows, all_plain)
 		var mode := "All Plain" if all_plain else "Random"
 		_status_label.text = "%s map generated: %dx%d" % [mode, cols, rows]
+		_reset_paint_state()
 	else:
 		_status_label.text = "Hex map node is missing regenerate_map API."
 
@@ -100,9 +114,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			_paint_under_cursor()
 		else:
 			_last_painted = Vector2i(-1, -1)
+	if event is InputEventMouseMotion:
+		_update_hover_state()
+		_update_highlight_visuals()
 
 
 func _process(_delta: float) -> void:
+	_update_hover_state()
+	_update_highlight_visuals()
 	if _is_painting:
 		_paint_under_cursor()
 
@@ -145,7 +164,7 @@ func _on_paint_type_changed(_index: int) -> void:
 
 
 func _on_mode_changed(_index: int) -> void:
-	_last_painted = Vector2i(-1, -1)
+	_reset_paint_state()
 	_update_editor_mode_ui()
 
 
@@ -155,13 +174,13 @@ func _on_road_setting_changed(_index: int) -> void:
 
 func _update_editor_mode_ui() -> void:
 	_road_row.visible = _get_edit_mode() == EDIT_MODE_ROAD
+	_update_highlight_visuals()
 
 
 func _paint_under_cursor() -> void:
-	var tile := _pick_tile_under_cursor()
-	if tile == null:
+	if _hover_tile == null:
 		return
-	var coord := Vector2i(tile.grid_col, tile.grid_row)
+	var coord := _hover_coord
 	if _get_edit_mode() == EDIT_MODE_ROAD:
 		_paint_road_at(coord)
 	else:
@@ -218,6 +237,163 @@ func _pick_tile_under_cursor() -> TileBase:
 		return null
 	var collider := hit.get("collider") as Node
 	return _find_tile_node(collider)
+
+
+func _update_hover_state() -> void:
+	var tile := _pick_tile_under_cursor()
+	_hover_tile = tile
+	if tile == null:
+		_hover_coord = Vector2i(-1, -1)
+		return
+	_hover_coord = Vector2i(tile.grid_col, tile.grid_row)
+
+
+func _setup_highlight_meshes() -> void:
+	var tile_mesh := CylinderMesh.new()
+	tile_mesh.top_radius = 0.98
+	tile_mesh.bottom_radius = 0.98
+	tile_mesh.height = 0.02
+	tile_mesh.radial_segments = 6
+	_tile_highlight.mesh = tile_mesh
+
+	var link_mesh := BoxMesh.new()
+	link_mesh.size = Vector3(0.30, 0.02, 1.0)
+	_link_highlight.mesh = link_mesh
+
+	_tile_highlight_material = _create_highlight_material()
+	_link_highlight_material = _create_highlight_material()
+	_tile_highlight.material_override = _tile_highlight_material
+	_link_highlight.material_override = _link_highlight_material
+	_tile_highlight.visible = false
+	_link_highlight.visible = false
+
+
+func _create_highlight_material() -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.no_depth_test = true
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return mat
+
+
+func _update_highlight_visuals() -> void:
+	if _tile_highlight_material == null or _link_highlight_material == null:
+		return
+	if _hover_coord.x < 0:
+		_hide_highlights()
+		return
+
+	var strong := _is_painting
+	var color := _get_mode_highlight_color(strong)
+	_tile_highlight_material.albedo_color = color
+	_link_highlight_material.albedo_color = color
+
+	var tile_world := _coord_to_world(_hover_coord)
+	tile_world.y = TILE_HIGHLIGHT_Y
+	_tile_highlight.visible = true
+	_tile_highlight.position = tile_world
+	_tile_highlight.scale = Vector3.ONE
+
+	if _get_edit_mode() != EDIT_MODE_ROAD:
+		_link_highlight.visible = false
+		return
+
+	var dir := _get_selected_road_direction()
+	if dir >= 0:
+		var nb := _get_neighbor_coord(_hover_coord, dir)
+		if _is_coord_editable_road(_hover_coord) and _is_coord_editable_road(nb):
+			_show_link_between(_hover_coord, nb)
+		else:
+			_link_highlight.visible = false
+		return
+
+	if not _is_painting or _last_painted.x < 0:
+		_link_highlight.visible = false
+		return
+	if _last_painted == _hover_coord:
+		_link_highlight.visible = false
+		return
+	if _is_adjacent(_last_painted, _hover_coord):
+		_show_link_between(_last_painted, _hover_coord)
+	else:
+		_link_highlight.visible = false
+
+
+func _show_link_between(a: Vector2i, b: Vector2i) -> void:
+	var aw := _coord_to_world(a)
+	var bw := _coord_to_world(b)
+	aw.y = LINK_HIGHLIGHT_Y
+	bw.y = LINK_HIGHLIGHT_Y
+	var delta := bw - aw
+	var dist := delta.length()
+	if dist <= 0.001:
+		_link_highlight.visible = false
+		return
+	_link_highlight.visible = true
+	_link_highlight.position = (aw + bw) * 0.5
+	_link_highlight.scale = Vector3(1.0, 1.0, dist)
+	_link_highlight.look_at(bw, Vector3.UP, true)
+
+
+func _hide_highlights() -> void:
+	_tile_highlight.visible = false
+	_link_highlight.visible = false
+
+
+func _reset_paint_state() -> void:
+	_is_painting = false
+	_last_painted = Vector2i(-1, -1)
+
+
+func _get_mode_highlight_color(strong: bool) -> Color:
+	var alpha := DRAG_ALPHA if strong else HOVER_ALPHA
+	if _get_edit_mode() == EDIT_MODE_ROAD:
+		if _get_road_operation() == ROAD_OP_REMOVE:
+			return Color(0.95, 0.28, 0.28, alpha)
+		return Color(0.20, 0.90, 0.30, alpha)
+	return Color(0.22, 0.58, 0.98, alpha)
+
+
+func _coord_to_world(coord: Vector2i) -> Vector3:
+	if _hex_map != null and _hex_map.has_method("hex_to_world"):
+		return _hex_map.call("hex_to_world", coord.x, coord.y)
+	return Vector3.ZERO
+
+
+func _get_neighbor_coord(coord: Vector2i, dir: int) -> Vector2i:
+	if _hex_map == null or not _hex_map.has_method("get_neighbor"):
+		return Vector2i(-1, -1)
+	return _hex_map.call("get_neighbor", coord.x, coord.y, dir)
+
+
+func _is_adjacent(a: Vector2i, b: Vector2i) -> bool:
+	if _hex_map == null or not _hex_map.has_method("get_direction_between"):
+		return false
+	var dir := int(_hex_map.call("get_direction_between", a.x, a.y, b.x, b.y))
+	return dir >= 0
+
+
+func _is_coord_editable_road(coord: Vector2i) -> bool:
+	if not _is_in_map_bounds(coord):
+		return false
+	if _hex_map == null or not _hex_map.has_method("get_tile_type_at"):
+		return false
+	var tile_type := int(_hex_map.call("get_tile_type_at", coord.x, coord.y))
+	return tile_type != IMPASSABLE_MOUNTAIN and tile_type != IMPASSABLE_WATER
+
+
+func _is_in_map_bounds(coord: Vector2i) -> bool:
+	if _hex_map == null or not _hex_map.has_method("get_map_size"):
+		return false
+	var size := _hex_map.call("get_map_size") as Vector2i
+	return coord.x >= 0 and coord.y >= 0 and coord.x < size.x and coord.y < size.y
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+		_reset_paint_state()
+		_hide_highlights()
 
 
 func _find_tile_node(node: Node) -> TileBase:
