@@ -7,19 +7,33 @@ extends Node3D
 @export var min_zoom: float = 6.0
 @export var max_zoom: float = 25.0
 
-var cam: Camera3D
+@onready var cam: Camera3D = $Camera3D
 
-func _ready():
-	cam = get_child(0)
+var _zoom := 6.0
 
-func _process(delta):
+func _ready() -> void:
+	_zoom = clampf(cam.position.y, min_zoom, max_zoom)
+	_apply_zoom()
+
+func _process(delta: float) -> void:
 	# WASD 平移
-	var input_dir = Vector3.ZERO
+	var input_dir := Vector3.ZERO
 	if Input.is_action_pressed("ui_left"):  input_dir.x -= 1
 	if Input.is_action_pressed("ui_right"): input_dir.x += 1
 	if Input.is_action_pressed("ui_up"):input_dir.z -= 1
 	if Input.is_action_pressed("ui_down"):input_dir.z += 1
 
+	if Input.is_action_just_pressed("zoom_in"):
+		_zoom = clampf(_zoom - zoom_speed, min_zoom, max_zoom)
+		_apply_zoom()
+	elif Input.is_action_just_pressed("zoom_out"):
+		_zoom = clampf(_zoom + zoom_speed, min_zoom, max_zoom)
+		_apply_zoom()
+
 	# 保持俯视平面移动，不歪
 	input_dir = input_dir.normalized()
 	position += input_dir * move_speed * delta
+
+
+func _apply_zoom() -> void:
+	cam.position = Vector3(0.0, _zoom, _zoom)
