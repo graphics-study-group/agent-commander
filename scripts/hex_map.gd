@@ -270,6 +270,18 @@ func _in_bounds(col: int, row: int) -> bool:
 	return col >= 0 and col < _grid_cols and row >= 0 and row < _grid_rows
 
 
+func get_tile_type_at(col: int, row: int) -> int:
+	if not _in_bounds(col, row):
+		return -1
+	return int(_terrain[row][col])
+
+
+func get_road_mask_at(col: int, row: int) -> int:
+	if not _in_bounds(col, row):
+		return 0
+	return int(_roads[row][col])
+
+
 func _get_direction(fc: int, fr: int, tc: int, tr: int) -> int:
 	var off: Array = OFFSETS_ODD if fr % 2 == 1 else OFFSETS_EVEN
 	for d in range(6):
@@ -304,7 +316,7 @@ func _generate_tiles() -> void:
 			if tile == null:
 				continue
 			tile.position = hex_to_world(col, row)
-			tile.configure(col, row, _terrain[row][col], _roads[row][col])
+			tile.configure(col, row, _terrain[row][col], _roads[row][col], self)
 			_tile_nodes[row][col] = tile
 			_generated_root.add_child(tile)
 
