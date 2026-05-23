@@ -2,4 +2,8 @@
 .godot/
 /android/
 
+assets/
 .vscode/
+HISTORY.md
+PROMPTS.md
+api_key.txt

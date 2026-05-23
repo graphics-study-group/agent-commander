@@ -9,6 +9,7 @@ extends Resource
 @export var roads: Array = []
 @export var spawn_col: int = 8
 @export var spawn_row: int = 8
+@export var cell_region: Array = []
 
 
 func validate() -> String:

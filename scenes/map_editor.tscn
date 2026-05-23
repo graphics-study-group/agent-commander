@@ -31,7 +31,7 @@ anchors_preset = 1
 anchor_left = 1.0
 offset_left = -360.0
 offset_right = -16.0
-offset_bottom = 280.0
+offset_bottom = 700.0
 
 [node name="VBox" type="VBoxContainer" parent="UILayer/EditorUI"]
 layout_mode = 2

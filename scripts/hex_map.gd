@@ -29,21 +29,24 @@ var _grid_rows := GRID_ROWS
 var _terrain: Array = []
 var _roads: Array = []
 var _tile_nodes: Array = []
+var _spawn_col := 8
+var _spawn_row := 8
 
-var _unit: Unit
-var _unit_col := 8
-var _unit_row := 8
+# unit_name → {unit, col, row, color, marker_root, cylinder, name_label,
+#              hp_bg, hp_fg, move_queue, current_tween, is_moving,
+#              speed_buff_kmh, speed_buff_hexes}
+var _units: Dictionary = {}
+
+# _cell_region[row][col] = region name string, "" = unnamed
+var _cell_region: Array = []
+var _region_labels_root: Node3D = null
 
 var _generated_root: Node3D
-var _marker: MeshInstance3D
 var _tooltip_canvas: CanvasLayer
 var _tooltip: PanelContainer
 var _tooltip_label: RichTextLabel
 
-var _move_queue: Array = []
-var _is_moving := false
-var _speed_buff_kmh := 0.0
-var _speed_buff_hexes := 0
+signal movement_finished(unit_name: String)
 
 
 func _ready() -> void:
@@ -58,18 +61,29 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if _marker == null or _tooltip == null:
+	if _tooltip == null:
 		return
 	var camera := get_viewport().get_camera_3d()
 	if camera == null:
 		return
-	var screen_pos := camera.unproject_position(_marker.global_position)
 	var mouse_pos := get_viewport().get_mouse_position()
-	if screen_pos.distance_to(mouse_pos) < 44.0 and _unit != null:
+	var closest_unit: Unit = null
+	var closest_dist := 60.0
+	for unit_name: String in _units:
+		var d: Dictionary = _units[unit_name]
+		var mr: Node3D = d.get("marker_root")
+		if not is_instance_valid(mr):
+			continue
+		var screen_pos := camera.unproject_position(mr.global_position + Vector3(0, 1.5, 0))
+		var dist := screen_pos.distance_to(mouse_pos)
+		if dist < closest_dist:
+			closest_dist = dist
+			closest_unit = d.get("unit") as Unit
+	if closest_unit != null:
 		_tooltip.visible = true
-		_tooltip_label.text = _unit.get_display_text()
+		_tooltip_label.text = closest_unit.get_display_text()
 		var vp := get_viewport().get_visible_rect().size
-		var tp := Vector2(screen_pos.x + 14.0, screen_pos.y - _tooltip.size.y - 8.0)
+		var tp := Vector2(mouse_pos.x + 14.0, mouse_pos.y - _tooltip.size.y - 8.0)
 		tp.x = clamp(tp.x, 4.0, vp.x - _tooltip.size.x - 4.0)
 		tp.y = clamp(tp.y, 4.0, vp.y - _tooltip.size.y - 4.0)
 		_tooltip.position = tp
@@ -83,13 +97,42 @@ func _exit_tree() -> void:
 
 
 func _init_refs() -> void:
-	var ui := get_tree().get_first_node_in_group("commander_ui")
-	if ui != null:
-		_unit = ui.get("unit") as Unit
-		ui.move_command.connect(_on_move_command)
-		ui.pathfind_command.connect(_on_pathfind_command)
 	_create_tooltip()
 
+
+# ── Unit registration ─────────────────────────────────────────────────────────
+
+func register_unit(unit: Unit, color: Color = Color(0.25, 0.55, 1.0),
+		preferred_col: int = -1, preferred_row: int = -1) -> void:
+	if unit == null:
+		return
+	var col := preferred_col
+	var row := preferred_row
+	if col < 0 or row < 0 or not _in_bounds(col, row) or _is_impassable(_terrain[row][col]):
+		var sp := _find_start_pos(preferred_col, preferred_row)
+		col = sp.x
+		row = sp.y
+	var m := _create_unit_marker_node(unit.unit_name, col, row, color)
+	_units[unit.unit_name] = {
+		"unit": unit,
+		"col": col,
+		"row": row,
+		"color": color,
+		"marker_root": m["marker_root"],
+		"cylinder": m["cylinder"],
+		"name_label": m["name_label"],
+		"hp_bg": m["hp_bg"],
+		"hp_fg": m["hp_fg"],
+		"move_queue": [],
+		"current_tween": null,
+		"is_moving": false,
+		"speed_buff_kmh": 0.0,
+		"speed_buff_hexes": 0
+	}
+	update_unit_org(unit.unit_name, unit.ORG)
+
+
+# ── Map generation / load / save ──────────────────────────────────────────────
 
 func regenerate_random_map() -> void:
 	regenerate_map(GRID_COLS, GRID_ROWS, false)
@@ -104,7 +147,10 @@ func regenerate_map(cols: int, rows: int, all_plain: bool = false) -> void:
 	else:
 		_generate_terrain()
 		_generate_roads()
-	_find_start_pos()
+	var sp := _find_start_pos()
+	_spawn_col = sp.x
+	_spawn_row = sp.y
+	_init_cell_region()
 	_rebuild_visuals()
 
 
@@ -134,24 +180,38 @@ func load_map_data(data: MapData) -> bool:
 	var legacy_terrain := data.tile_types.is_empty() and data.version <= 1
 	_terrain = _normalize_tile_grid(data.get_tile_types_grid(), legacy_terrain)
 
-	_unit_col = data.spawn_col
-	_unit_row = data.spawn_row
-	if _is_impassable(_terrain[_unit_row][_unit_col]):
-		_find_start_pos()
+	_spawn_col = data.spawn_col
+	_spawn_row = data.spawn_row
+	if _is_impassable(_terrain[_spawn_row][_spawn_col]):
+		var sp := _find_start_pos()
+		_spawn_col = sp.x
+		_spawn_row = sp.y
 
+	# Reposition any registered units that landed on impassable terrain
+	for unit_name: String in _units:
+		var d: Dictionary = _units[unit_name]
+		if _is_impassable(_terrain[int(d["row"])][int(d["col"])]):
+			d["col"] = _spawn_col
+			d["row"] = _spawn_row
+
+	_init_cell_region()
+	if data.cell_region.size() == _grid_rows:
+		_cell_region = _copy_grid(data.cell_region)
 	_rebuild_visuals()
 	return true
 
 
 func export_map_data() -> MapData:
 	var data := MapData.new()
-	data.version = 2
+	data.version = 3
 	data.cols = _grid_cols
 	data.rows = _grid_rows
 	data.set_tile_types_grid(_terrain)
 	data.roads = _copy_grid(_roads)
-	data.spawn_col = _unit_col
-	data.spawn_row = _unit_row
+	data.spawn_col = _spawn_col
+	data.spawn_row = _spawn_row
+	if not _cell_region.is_empty():
+		data.cell_region = _copy_grid(_cell_region)
 	return data
 
 
@@ -187,10 +247,12 @@ func _normalize_tile_value(v: int, legacy_terrain: bool) -> int:
 
 
 func _rebuild_visuals() -> void:
+	_region_labels_root = null  # freed with _generated_root below
 	_clear_generated_root()
 	_generate_tiles()
-	_create_marker()
-	_update_marker_pos()
+	_recreate_all_markers()
+	_create_coord_labels()
+	refresh_region_labels()
 
 
 func _clear_generated_root() -> void:
@@ -230,16 +292,19 @@ func _generate_plain_terrain() -> void:
 			_terrain[r][c] = Terrain.PLAIN
 
 
-func _find_start_pos() -> void:
+func _find_start_pos(pref_col: int = -1, pref_row: int = -1) -> Vector2i:
+	var tc := pref_col if pref_col >= 0 else _grid_cols / 2
+	var tr := pref_row if pref_row >= 0 else _grid_rows / 2
 	var best_dist := INF
+	var best := Vector2i(tc, tr)
 	for r in range(_grid_rows):
 		for c in range(_grid_cols):
 			if not _is_impassable(_terrain[r][c]):
-				var d := _hex_dist(c, r, _grid_cols / 2, _grid_rows / 2)
+				var d := _hex_dist(c, r, tc, tr)
 				if d < best_dist:
 					best_dist = d
-					_unit_col = c
-					_unit_row = r
+					best = Vector2i(c, r)
+	return best
 
 
 func _generate_roads() -> void:
@@ -250,8 +315,51 @@ func _generate_roads() -> void:
 		for c in range(_grid_cols):
 			_roads[r][c] = 0
 
-	var attempts := _grid_cols * _grid_rows
-	for _i in range(attempts):
+	# Collect all city positions
+	var cities: Array = []
+	for r in range(_grid_rows):
+		for c in range(_grid_cols):
+			if _terrain[r][c] == Terrain.CITY:
+				cities.append(Vector2i(c, r))
+
+	# Connect cities with a greedy spanning tree (nearest unconnected city next)
+	if cities.size() >= 2:
+		var connected: Array = [cities[0]]
+		var remaining: Array = cities.slice(1)
+		while not remaining.is_empty():
+			var best_from: Vector2i = connected[0]
+			var best_to: Vector2i = remaining[0]
+			var best_dist := INF
+			for from: Vector2i in connected:
+				for to: Vector2i in remaining:
+					var d := _hex_dist(from.x, from.y, to.x, to.y)
+					if d < best_dist:
+						best_dist = d
+						best_from = from
+						best_to = to
+			var path := _astar(best_from.x, best_from.y, best_to.x, best_to.y)
+			if not path.is_empty():
+				_mark_path_as_road(best_from, path)
+			remaining.erase(best_to)
+			connected.append(best_to)
+
+	# Sparse random segments for texture
+	_add_random_road_segments(_grid_cols * _grid_rows / 8)
+
+
+func _mark_path_as_road(start: Vector2i, path: Array) -> void:
+	var prev := start
+	for step in path:
+		var cur := Vector2i(int(step[0]), int(step[1]))
+		var dir := _get_direction(prev.x, prev.y, cur.x, cur.y)
+		if dir >= 0:
+			_roads[prev.y][prev.x] |= (1 << dir)
+			_roads[cur.y][cur.x] |= (1 << ((dir + 3) % 6))
+		prev = cur
+
+
+func _add_random_road_segments(count: int) -> void:
+	for _i in range(count):
 		var col := randi() % _grid_cols
 		var row := randi() % _grid_rows
 		if _is_impassable(_terrain[row][col]):
@@ -347,9 +455,13 @@ func set_tile_type_at(col: int, row: int, tile_type: int) -> bool:
 	if int(_terrain[row][col]) == normalized_type:
 		return false
 	_terrain[row][col] = normalized_type
-	if _is_impassable(_terrain[_unit_row][_unit_col]):
-		_find_start_pos()
-		_update_marker_pos()
+	for unit_name: String in _units:
+		var d: Dictionary = _units[unit_name]
+		if _is_impassable(_terrain[int(d["row"])][int(d["col"])]):
+			var sp := _find_start_pos()
+			d["col"] = sp.x
+			d["row"] = sp.y
+			_update_marker_pos_for(unit_name)
 	_replace_tile_node(col, row)
 	_refresh_tile_and_neighbors(col, row)
 	return true
@@ -445,109 +557,424 @@ func _get_tile_node(col: int, row: int) -> TileBase:
 	return row_data[col] as TileBase
 
 
-func _create_marker() -> void:
-	_marker = MeshInstance3D.new()
+# ── Marker creation ───────────────────────────────────────────────────────────
+
+func _create_unit_marker_node(unit_name: String, col: int, row: int, color: Color) -> Dictionary:
+	var root := Node3D.new()
+	root.name = "Marker_" + unit_name
+	root.position = hex_to_world(col, row)
+	_generated_root.add_child(root)
+
+	# Cylinder body
+	var cyl_mesh := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = 0.18
 	cyl.bottom_radius = 0.18
 	cyl.height = 0.45
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.25, 0.55, 1.0)
+	mat.albedo_color = color
 	mat.emission_enabled = true
-	mat.emission = Color(0.1, 0.3, 0.8)
-	_marker.mesh = cyl
-	_marker.material_override = mat
-	_generated_root.add_child(_marker)
+	mat.emission = color * 0.5
+	cyl_mesh.mesh = cyl
+	cyl_mesh.material_override = mat
+	cyl_mesh.position = Vector3(0.0, 1.5, 0.0)
+	root.add_child(cyl_mesh)
+
+	# Health bar: green (filled) segment
+	var hp_fg := MeshInstance3D.new()
+	var hp_fg_quad := QuadMesh.new()
+	hp_fg_quad.size = Vector2(0.9, 0.10)
+	var hp_fg_mat := StandardMaterial3D.new()
+	hp_fg_mat.albedo_color = Color(0.2, 0.85, 0.2)
+	hp_fg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	hp_fg_mat.no_depth_test = true
+	hp_fg_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	hp_fg.mesh = hp_fg_quad
+	hp_fg.material_override = hp_fg_mat
+	hp_fg.position = Vector3(0.0, 2.1, 0.05)
+	root.add_child(hp_fg)
+
+	# Health bar: dark (missing HP) segment — tiled right of green, same z
+	var hp_bg := MeshInstance3D.new()
+	var hp_bg_quad := QuadMesh.new()
+	hp_bg_quad.size = Vector2(0.9, 0.10)
+	var hp_bg_mat := StandardMaterial3D.new()
+	hp_bg_mat.albedo_color = Color(0.08, 0.08, 0.08)
+	hp_bg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	hp_bg_mat.no_depth_test = true
+	hp_bg_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	hp_bg.mesh = hp_bg_quad
+	hp_bg.material_override = hp_bg_mat
+	hp_bg.position = Vector3(0.0, 2.1, 0.05)
+	root.add_child(hp_bg)
+
+	# Unit name label
+	var name_lbl := Label3D.new()
+	name_lbl.text = unit_name
+	name_lbl.font_size = 48
+	name_lbl.pixel_size = 0.006
+	name_lbl.modulate = Color.WHITE
+	name_lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	name_lbl.no_depth_test = true
+	name_lbl.position = Vector3(0.0, 2.45, 0.0)
+	root.add_child(name_lbl)
+
+	return {
+		"marker_root": root,
+		"cylinder": cyl_mesh,
+		"hp_bg": hp_bg,
+		"hp_fg": hp_fg,
+		"name_label": name_lbl
+	}
 
 
-func _update_marker_pos() -> void:
-	if _marker == null:
+func _recreate_all_markers() -> void:
+	for unit_name: String in _units:
+		var d: Dictionary = _units[unit_name]
+		var m := _create_unit_marker_node(unit_name, int(d["col"]), int(d["row"]),
+				d.get("color", Color(0.25, 0.55, 1.0)) as Color)
+		d["marker_root"] = m["marker_root"]
+		d["cylinder"]    = m["cylinder"]
+		d["hp_bg"]       = m["hp_bg"]
+		d["hp_fg"]       = m["hp_fg"]
+		d["name_label"]  = m["name_label"]
+		update_unit_org(unit_name, (d["unit"] as Unit).ORG)
+
+
+func _update_marker_pos_for(unit_name: String) -> void:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
 		return
-	var p := hex_to_world(_unit_col, _unit_row)
-	p.y = 1.5
-	_marker.position = p
-
-
-func _on_move_command(direction: int, steps: int) -> void:
-	if _is_moving:
+	var mr: Node3D = d.get("marker_root")
+	if not is_instance_valid(mr):
 		return
-	var path: Array = []
-	var cc := _unit_col
-	var cr := _unit_row
-	for _i in range(steps):
-		var nb := get_neighbor(cc, cr, direction)
-		if not _in_bounds(nb.x, nb.y):
-			break
-		if _is_impassable(_terrain[nb.y][nb.x]):
-			break
-		path.append([nb.x, nb.y])
-		cc = nb.x
-		cr = nb.y
-	if not path.is_empty():
-		_move_queue = path
-		_execute_next_move()
+	mr.position = hex_to_world(int(d["col"]), int(d["row"]))
 
 
-func _on_pathfind_command(target_col: int, target_row: int) -> void:
-	if _is_moving:
+func update_unit_org(unit_name: String, org: float) -> void:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
 		return
-	var tc := target_col
-	var tr := target_row
+	var hp_fg: MeshInstance3D = d.get("hp_fg")
+	var hp_bg: MeshInstance3D = d.get("hp_bg")
+	if not is_instance_valid(hp_fg) or not is_instance_valid(hp_bg):
+		return
+	const W := 0.9   # total bar width (matches QuadMesh size.x)
+	var pct := clampf(org / 100.0, 0.0, 1.0)
+	# Green (left): scale = pct, center shifts so left edge stays fixed at -W/2
+	hp_fg.scale    = Vector3(pct, 1.0, 1.0)
+	hp_fg.position = Vector3((W / 2.0) * (pct - 1.0), 2.1, 0.05)
+	# Dark (right): scale = 1-pct, center shifts so right edge stays fixed at +W/2
+	hp_bg.scale    = Vector3(1.0 - pct, 1.0, 1.0)
+	hp_bg.position = Vector3((W / 2.0) * pct, 2.1, 0.05)
+
+
+# ── Public movement API ───────────────────────────────────────────────────────
+
+func calc_path(fc: int, fr: int, tc: int, tr: int) -> Array:
 	if _in_bounds(tc, tr) and _is_impassable(_terrain[tr][tc]):
 		var best := Vector2i(-1, -1)
 		var best_dist := INF
 		for dir in range(6):
 			var nb := get_neighbor(tc, tr, dir)
 			if _in_bounds(nb.x, nb.y) and not _is_impassable(_terrain[nb.y][nb.x]):
-				var d := _hex_dist(nb.x, nb.y, _unit_col, _unit_row)
+				var d := _hex_dist(nb.x, nb.y, fc, fr)
 				if d < best_dist:
 					best_dist = d
 					best = nb
 		if best.x < 0:
-			return
+			return []
 		tc = best.x
 		tr = best.y
-	var path := _astar(_unit_col, _unit_row, tc, tr)
-	if not path.is_empty():
-		_move_queue = path
-		_execute_next_move()
+	return _astar(fc, fr, tc, tr)
 
 
-func _execute_next_move() -> void:
-	if _move_queue.is_empty():
-		_is_moving = false
+func set_move_path(unit_name: String, path: Array) -> void:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty() or path.is_empty():
 		return
-	_is_moving = true
-	var next := _move_queue.pop_front() as Array
-	var nc: int = next[0]
-	var nr: int = next[1]
+	d["move_queue"] = path.duplicate()
+	if not d["is_moving"]:
+		_execute_next_move(unit_name)
 
-	var from_tile := _get_tile_node(_unit_col, _unit_row)
-	var to_tile := _get_tile_node(nc, nr)
-	if from_tile != null and _unit != null:
-		from_tile.on_unit_leave(_unit)
-	if to_tile != null and _unit != null:
-		to_tile.on_unit_enter(_unit)
 
-	var travel_time := _travel_time(_unit_col, _unit_row, nc, nr)
-	var target_pos := hex_to_world(nc, nr)
-	target_pos.y = 0.3
+func clear_move_queue(unit_name: String) -> void:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
+		return
+	var tween: Tween = d.get("current_tween")
+	if is_instance_valid(tween) and tween.is_valid():
+		tween.kill()
+	d["current_tween"] = null
+	d["move_queue"] = []
+	if d["is_moving"]:
+		d["is_moving"] = false
+		_update_marker_pos_for(unit_name)
+		movement_finished.emit(unit_name)
 
-	var tw := create_tween()
-	tw.tween_property(_marker, "position", target_pos, travel_time)
-	tw.tween_callback(func():
-		_unit_col = nc
-		_unit_row = nr
-		if _speed_buff_hexes > 0:
-			_speed_buff_hexes -= 1
-			if _speed_buff_hexes <= 0:
-				_speed_buff_kmh = 0.0
-		_execute_next_move()
+
+func get_unit_pos(unit_name: String) -> Vector2i:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
+		return Vector2i.ZERO
+	return Vector2i(int(d["col"]), int(d["row"]))
+
+
+func apply_speed_buff(unit_name: String, extra_kmh: float, hexes: int) -> void:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
+		return
+	d["speed_buff_kmh"] = extra_kmh
+	d["speed_buff_hexes"] = hexes
+
+
+func rename_unit(old_name: String, new_name: String) -> void:
+	if not _units.has(old_name) or new_name.is_empty():
+		return
+	var d: Dictionary = _units[old_name]
+	_units.erase(old_name)
+	_units[new_name] = d
+	var lbl: Label3D = d.get("name_label")
+	if is_instance_valid(lbl):
+		lbl.text = new_name
+
+
+# ── Region system ─────────────────────────────────────────────────────────────
+
+func _init_cell_region() -> void:
+	_cell_region.resize(_grid_rows)
+	for r in range(_grid_rows):
+		_cell_region[r] = []
+		_cell_region[r].resize(_grid_cols)
+		for c in range(_grid_cols):
+			_cell_region[r][c] = ""
+
+
+func get_region_name(col: int, row: int) -> String:
+	if not _in_bounds(col, row) or _cell_region.is_empty():
+		return ""
+	return str(_cell_region[row][col])
+
+
+func name_region_rect(col_min: int, col_max: int, row_min: int, row_max: int, name: String) -> void:
+	if _cell_region.is_empty():
+		return
+	for r in range(maxi(0, row_min), mini(_grid_rows, row_max + 1)):
+		for c in range(maxi(0, col_min), mini(_grid_cols, col_max + 1)):
+			_cell_region[r][c] = name
+	refresh_region_labels()
+
+
+func name_point(col: int, row: int, pname: String) -> void:
+	if not _in_bounds(col, row) or _cell_region.is_empty():
+		return
+	_cell_region[row][col] = pname
+	refresh_region_labels()
+
+
+func clear_region_names() -> void:
+	_init_cell_region()
+	refresh_region_labels()
+
+
+func get_all_region_names() -> Array:
+	var result: Array = []
+	if _cell_region.is_empty():
+		return result
+	var seen: Dictionary = {}
+	for r in range(_grid_rows):
+		for c in range(_grid_cols):
+			var rname: String = str(_cell_region[r][c])
+			if not rname.is_empty() and not seen.has(rname):
+				seen[rname] = true
+				result.append(rname)
+	return result
+
+
+func get_named_points() -> Array:
+	var result: Array = []
+	if _cell_region.is_empty():
+		return result
+	for r in range(_grid_rows):
+		for c in range(_grid_cols):
+			var rname: String = str(_cell_region[r][c])
+			if not rname.is_empty():
+				result.append({"name": rname, "col": c, "row": r})
+	return result
+
+
+func rename_region_name(old_name: String, new_name: String) -> void:
+	if _cell_region.is_empty() or old_name == new_name or new_name.is_empty():
+		return
+	for r in range(_grid_rows):
+		for c in range(_grid_cols):
+			if str(_cell_region[r][c]) == old_name:
+				_cell_region[r][c] = new_name
+	refresh_region_labels()
+
+
+func refresh_region_labels() -> void:
+	if not is_instance_valid(_generated_root):
+		return
+	if is_instance_valid(_region_labels_root):
+		_region_labels_root.queue_free()
+	_region_labels_root = Node3D.new()
+	_region_labels_root.name = "RegionLabels"
+	_generated_root.add_child(_region_labels_root)
+	if _cell_region.is_empty():
+		return
+
+	var name_sum: Dictionary = {}
+	for r in range(_grid_rows):
+		for c in range(_grid_cols):
+			var rname: String = str(_cell_region[r][c])
+			if rname.is_empty():
+				continue
+			var wpos := hex_to_world(c, r)
+			if not name_sum.has(rname):
+				name_sum[rname] = [wpos.x, wpos.z, 1]
+			else:
+				name_sum[rname][0] += wpos.x
+				name_sum[rname][1] += wpos.z
+				name_sum[rname][2] += 1
+
+	for rname: String in name_sum:
+		var s: Array = name_sum[rname]
+		var cx: float = s[0] / float(s[2])
+		var cz: float = s[1] / float(s[2])
+		var lbl := Label3D.new()
+		lbl.text = rname
+		lbl.font_size = 72
+		lbl.pixel_size = 0.0075
+		lbl.modulate = Color(1.0, 0.85, 0.3, 0.5)
+		lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		lbl.no_depth_test = true
+		lbl.position = Vector3(cx, 0.3, cz)
+		_region_labels_root.add_child(lbl)
+
+
+# ── Map string for AI context ─────────────────────────────────────────────────
+
+func get_map_string() -> String:
+	const T_CHAR := ["P", "F", "M", "W", "C"]
+	var col_header := "    "  # 4-space prefix matches row data prefix width
+	for c in range(_grid_cols):
+		col_header += (str(c) if c < 10 else char(ord("A") + c - 10))
+	var lines: Array[String] = [
+		"【地图%d×%d: P=平原 F=树林 M=山地 W=水域 C=城市，小写=有路，→=奇数行右偏，列10+=A/B/C...】" \
+			% [_grid_cols, _grid_rows],
+		col_header
+	]
+	for r in range(_grid_rows):
+		var row_str := ""
+		for c in range(_grid_cols):
+			var t: int = _terrain[r][c]
+			var ch: String = T_CHAR[clampi(t, 0, T_CHAR.size() - 1)]
+			if int(_roads[r][c]) != 0:
+				ch = ch.to_lower()
+			row_str += ch
+		var prefix := "%2d%s " % [r, "→" if r % 2 == 1 else " "]
+		lines.append(prefix + row_str)
+
+	# Append named regions summary if any cells have been named
+	if not _cell_region.is_empty():
+		var name_bounds: Dictionary = {}
+		for r in range(_grid_rows):
+			for c in range(_grid_cols):
+				var rname: String = str(_cell_region[r][c])
+				if not rname.is_empty():
+					if not name_bounds.has(rname):
+						name_bounds[rname] = [c, c, r, r]
+					else:
+						name_bounds[rname][0] = mini(name_bounds[rname][0], c)
+						name_bounds[rname][1] = maxi(name_bounds[rname][1], c)
+						name_bounds[rname][2] = mini(name_bounds[rname][2], r)
+						name_bounds[rname][3] = maxi(name_bounds[rname][3], r)
+		if not name_bounds.is_empty():
+			lines.append("\n【已命名区域】")
+			for rname: String in name_bounds:
+				var b: Array = name_bounds[rname]
+				lines.append("  %s(列%d-%d,行%d-%d)" % [rname, b[0], b[1], b[2], b[3]])
+
+	return "\n".join(lines)
+
+
+func get_position_info(unit_name: String) -> String:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
+		return ""
+	var col: int = int(d["col"])
+	var row: int = int(d["row"])
+	const TERRAIN_NAMES := ["平原", "树林", "山地", "水域", "城市"]
+	const DIR_NAMES := ["东北", "东", "东南", "西南", "西", "西北"]
+	var cur: String = TERRAIN_NAMES[_terrain[row][col]]
+	var road_mask: int = _roads[row][col]
+	var region: String = get_region_name(col, row)
+	var region_part := (" 区域：" + region) if not region.is_empty() else ""
+	var info := "【%s】位置：(%d,%d) 地块：%s%s" % [unit_name, col, row, cur, region_part]
+	var neighbors: Array[String] = []
+	for dir in range(6):
+		var nb := get_neighbor(col, row, dir)
+		if _in_bounds(nb.x, nb.y):
+			var has_road := " [有路]" if (road_mask & (1 << dir)) else ""
+			neighbors.append("%s(%d,%d):%s%s" % [
+				DIR_NAMES[dir], nb.x, nb.y,
+				TERRAIN_NAMES[_terrain[nb.y][nb.x]], has_road
+			])
+	info += "\n相邻格：" + ", ".join(neighbors)
+	return info
+
+
+# ── Movement execution ────────────────────────────────────────────────────────
+
+func _execute_next_move(unit_name: String) -> void:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
+		return
+	var move_queue: Array = d["move_queue"]
+	if move_queue.is_empty():
+		if d["is_moving"]:
+			d["is_moving"] = false
+			_update_marker_pos_for(unit_name)
+			movement_finished.emit(unit_name)
+		return
+	d["is_moving"] = true
+	var next: Array = move_queue.pop_front() as Array
+	var nc: int = int(next[0])
+	var nr: int = int(next[1])
+	var u: Unit = d["unit"] as Unit
+	var col: int = int(d["col"])
+	var row: int = int(d["row"])
+
+	var from_tile := _get_tile_node(col, row)
+	var to_tile   := _get_tile_node(nc, nr)
+	if from_tile != null and u != null:
+		from_tile.on_unit_leave(u)
+	if to_tile != null and u != null:
+		to_tile.on_unit_enter(u)
+
+	var travel_time := _travel_time_for(unit_name, col, row, nc, nr)
+	var target_pos  := hex_to_world(nc, nr)
+
+	var marker_root: Node3D = d["marker_root"]
+	var tween := create_tween()
+	d["current_tween"] = tween
+	tween.tween_property(marker_root, "position", target_pos, travel_time)
+	tween.tween_callback(func():
+		d["col"] = nc
+		d["row"] = nr
+		if int(d["speed_buff_hexes"]) > 0:
+			d["speed_buff_hexes"] = int(d["speed_buff_hexes"]) - 1
+			if int(d["speed_buff_hexes"]) <= 0:
+				d["speed_buff_kmh"] = 0.0
+		_execute_next_move(unit_name)
 	)
 
 
-func _travel_time(fc: int, fr: int, tc: int, tr: int) -> float:
-	var base_spd: float = (_unit.SPEED if _unit != null else 4.0) + _speed_buff_kmh
+func _travel_time_for(unit_name: String, fc: int, fr: int, tc: int, tr: int) -> float:
+	var d: Dictionary = _units.get(unit_name, {})
+	var u: Unit = d.get("unit") as Unit
+	var base_spd: float = (u.SPEED if u != null else 4.0) + float(d.get("speed_buff_kmh", 0.0))
 	var spd := maxf(base_spd, 0.1)
 	var dir := _get_direction(fc, fr, tc, tr)
 	if dir >= 0 and (_roads[fr][fc] & (1 << dir)):
@@ -555,18 +982,64 @@ func _travel_time(fc: int, fr: int, tc: int, tr: int) -> float:
 	return HEX_DIST_KM / spd
 
 
-func apply_speed_buff(extra_kmh: float, hexes: int) -> void:
-	_speed_buff_kmh = extra_kmh
-	_speed_buff_hexes = hexes
+# ── Coordinate labels ─────────────────────────────────────────────────────────
 
+func _create_coord_labels() -> void:
+	for c in range(_grid_cols):
+		var lbl := Label3D.new()
+		lbl.text = str(c)
+		lbl.font_size = 48
+		lbl.pixel_size = 0.012
+		lbl.modulate = Color(1.0, 0.92, 0.4, 1.0)
+		lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		lbl.no_depth_test = true
+		var pos := hex_to_world(c, 0)
+		pos.z -= V_STEP * 1.4
+		pos.y = 0.5
+		lbl.position = pos
+		_generated_root.add_child(lbl)
+
+	for r in range(_grid_rows):
+		var lbl := Label3D.new()
+		lbl.text = str(r)
+		lbl.font_size = 48
+		lbl.pixel_size = 0.012
+		lbl.modulate = Color(0.4, 0.92, 1.0, 1.0)
+		lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		lbl.no_depth_test = true
+		var pos := hex_to_world(0, r)
+		pos.x -= H_STEP * 1.4
+		pos.y = 0.5
+		lbl.position = pos
+		_generated_root.add_child(lbl)
+
+
+# ── Tooltip ───────────────────────────────────────────────────────────────────
+
+func _create_tooltip() -> void:
+	_tooltip_canvas = CanvasLayer.new()
+	_tooltip_canvas.layer = 20
+	_tooltip = PanelContainer.new()
+	_tooltip.visible = false
+	_tooltip.custom_minimum_size = Vector2(220, 0)
+	_tooltip_canvas.add_child(_tooltip)
+	_tooltip_label = RichTextLabel.new()
+	_tooltip_label.bbcode_enabled = true
+	_tooltip_label.fit_content = true
+	_tooltip_label.custom_minimum_size = Vector2(210, 0)
+	_tooltip.add_child(_tooltip_label)
+	get_tree().root.add_child(_tooltip_canvas)
+
+
+# ── Pathfinding ───────────────────────────────────────────────────────────────
 
 func _astar(fc: int, fr: int, tc: int, tr: int) -> Array:
 	if fc == tc and fr == tr:
 		return []
 	var start := Vector2i(fc, fr)
-	var goal := Vector2i(tc, tr)
+	var goal  := Vector2i(tc, tr)
 	var open_set: Dictionary = {start: _hex_dist(fc, fr, tc, tr) * ASTAR_ROAD}
-	var g_score: Dictionary = {start: 0.0}
+	var g_score: Dictionary  = {start: 0.0}
 	var came_from: Dictionary = {}
 
 	while not open_set.is_empty():
@@ -612,37 +1085,3 @@ func _hex_dist(ac: int, ar: int, bc: int, br: int) -> float:
 	var bs := br
 	var by := -bq - bs
 	return max(abs(aq - bq), max(abs(ay - by), abs(as_ - bs)))
-
-
-func get_position_info() -> String:
-	const TERRAIN_NAMES := ["平原", "树林", "山地", "水域", "城市"]
-	const DIR_NAMES := ["东北", "东", "东南", "西南", "西", "西北"]
-	var cur: String = TERRAIN_NAMES[_terrain[_unit_row][_unit_col]]
-	var road_mask: int = _roads[_unit_row][_unit_col]
-	var info := "部队当前位置：(%d,%d) 地块：%s" % [_unit_col, _unit_row, cur]
-	var neighbors: Array[String] = []
-	for d in range(6):
-		var nb := get_neighbor(_unit_col, _unit_row, d)
-		if _in_bounds(nb.x, nb.y):
-			var has_road := " [有路]" if (road_mask & (1 << d)) else ""
-			neighbors.append("%s(%d,%d):%s%s" % [
-				DIR_NAMES[d], nb.x, nb.y,
-				TERRAIN_NAMES[_terrain[nb.y][nb.x]], has_road
-			])
-	info += "\n相邻格：" + ", ".join(neighbors)
-	return info
-
-
-func _create_tooltip() -> void:
-	_tooltip_canvas = CanvasLayer.new()
-	_tooltip_canvas.layer = 20
-	_tooltip = PanelContainer.new()
-	_tooltip.visible = false
-	_tooltip.custom_minimum_size = Vector2(220, 0)
-	_tooltip_canvas.add_child(_tooltip)
-	_tooltip_label = RichTextLabel.new()
-	_tooltip_label.bbcode_enabled = true
-	_tooltip_label.fit_content = true
-	_tooltip_label.custom_minimum_size = Vector2(210, 0)
-	_tooltip.add_child(_tooltip_label)
-	get_tree().root.add_child(_tooltip_canvas)
