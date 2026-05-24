@@ -3,7 +3,6 @@ extends Node
 
 signal response_ready(narrative: String)
 signal stats_changed(payload: Dictionary)
-signal speed_buff_applied(kmh: float, hexes: int)
 signal debug_log(msg: String)
 
 const DeepSeekAPI = preload("res://scripts/deepseek_api.gd")
@@ -21,6 +20,7 @@ var _exec_running: bool = false
 var _next_event_id: int = 0
 var _next_queue_id: int = 0
 var debug_mode: bool = false
+var _in_battle: bool = false
 
 # ── Tool definitions ──────────────────────────────────────────────────────────
 
@@ -44,13 +44,14 @@ const TOOLS: Array = [
 		"type": "function",
 		"function": {
 			"name": "enqueue_action",
-			"description": "将一个动作加入执行队列按序执行。\ntype 及对应 params 格式：\n· move         {path:[{col,row},...]}  路径来自 calculate_path\n· wait         {seconds:N}             等待N秒\n· modify_stats {changes:{STAT:delta,...}, reason:\"原因\"}  修改本部队属性（严禁归零）\n· speed_buff   {kmh:N, hexes:N}        临时速度加成\n· emit_event   {event_type:\"类型\", event_info:{}}  完成后向自身发送事件（可实现周期任务）\nretain=true 表示完成后保留在队列快照中（有持续影响的操作如DEF增益须设true）。",
+			"description": "将动作加入执行队列按序执行，或对 modify_stats 立即执行（immediate=true）。\ntype 及对应 params 格式：\n· move         {path:[{col,row},...]}  路径来自 calculate_path\n· wait         {seconds:N}             等待N秒\n· modify_stats {changes:{STAT:delta,...}, reason:\"原因\", delay_seconds:N, duration:N}  修改属性；delay_seconds=延迟N秒生效（默认0）；duration=-1永久，duration>0则N秒后自动还原（严禁归零）\n· emit_event   {event_type:\"类型\", event_info:{}}  完成后向自身发送事件（可实现周期任务）\nimmediate 仅对 modify_stats 有效：true=绕过队列立即生效（适用于急行军、临阵强化等即时效果）。\nretain 对 move/wait/emit_event 有效；modify_stats 的保留状态由 duration 自动决定。",
 			"parameters": {
 				"type": "object",
 				"properties": {
-					"type":   {"type": "string"},
-					"params": {"type": "object"},
-					"retain": {"type": "boolean", "description": "完成后是否保留在快照。默认false。"}
+					"type":      {"type": "string"},
+					"params":    {"type": "object"},
+					"retain":    {"type": "boolean", "description": "完成后是否保留在快照。默认false。"},
+					"immediate": {"type": "boolean", "description": "仅 modify_stats 可用。true=绕过队列立即生效。默认false。"}
 				},
 				"required": ["type", "params"]
 			}
@@ -60,7 +61,7 @@ const TOOLS: Array = [
 		"type": "function",
 		"function": {
 			"name": "delete_queue_item",
-			"description": "取消执行队列中指定 id 的动作（pending 或 running 均可；已完成的会被忽略）。",
+			"description": "取消执行队列中指定 id 的动作（pending 或 running 均可）。取消 running move 时单位停在当前格中心。",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -74,7 +75,7 @@ const TOOLS: Array = [
 		"type": "function",
 		"function": {
 			"name": "clear_exec_queue",
-			"description": "取消执行队列中所有 pending/running 动作并立即停止移动。",
+			"description": "取消执行队列中所有 pending/running 动作并立即停止移动（单位停在当前格中心）。",
 			"parameters": {"type": "object", "properties": {}}
 		}
 	},
@@ -124,6 +125,32 @@ const TOOLS: Array = [
 				"required": ["new_name"]
 			}
 		}
+	},
+	{
+		"type": "function",
+		"function": {
+			"name": "split_unit",
+			"description": "将本部队拆分为2-4个子部队，每个子部队继承当前部队作战记忆并可独立指挥。STR/SUPPLY按比例分配，其余属性继承不变。仅当统帅明确下令拆分时才可调用。",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"fragments": {
+						"type": "array",
+						"description": "子部队列表，str_fraction之和须≈1.0",
+						"items": {
+							"type": "object",
+							"properties": {
+								"name":         {"type": "string", "description": "新番号"},
+								"str_fraction": {"type": "number", "description": "分配的STR/SUPPLY比例（0-1）"}
+							},
+							"required": ["name", "str_fraction"]
+						}
+					},
+					"reason": {"type": "string", "description": "拆分原因"}
+				},
+				"required": ["fragments", "reason"]
+			}
+		}
 	}
 ]
 
@@ -150,6 +177,19 @@ func reload_rules(rules: String) -> void:
 	_api.set_system_prompt(_build_system_prompt())
 
 
+func enter_battle(battle_id: String) -> void:
+	_in_battle = true
+	receive_event("combat_start", {
+		"battle_id": battle_id,
+		"message": "你的部队正在交战。移动指令暂停。玩家指令将转发至战斗仲裁系统，你只需简短确认收到即可。"
+	})
+
+
+func exit_battle(outcome: String, battle_id: String) -> void:
+	_in_battle = false
+	receive_event("combat_ended", {"battle_id": battle_id, "outcome": outcome})
+
+
 # ── Public event API ──────────────────────────────────────────────────────────
 
 func receive_event(event_type: String, event_info: Dictionary) -> void:
@@ -163,6 +203,71 @@ func receive_event(event_type: String, event_info: Dictionary) -> void:
 	_inbox.append(event)
 	if not _is_processing:
 		_trigger_api_call()
+
+
+# ── Public queue API (called by enemy agent or other external controllers) ────
+
+func apply_stats_immediate(params: Dictionary) -> Dictionary:
+	if unit == null:
+		return {"error": "单位不可用"}
+	var changes: Dictionary = params.get("changes", {})
+	var reason: String      = params.get("reason", "")
+	var duration: float     = float(params.get("duration", -1.0))
+	unit.apply_changes(changes)
+	stats_changed.emit({"changes": changes, "reason": reason})
+	if duration > 0.0:
+		_start_timed_revert(changes, reason, duration)
+	return {"applied_immediate": true, "changes": changes}
+
+
+func enqueue_external(type: String, params: Dictionary, retain: bool = false) -> Dictionary:
+	var item := {
+		"id":         _next_queue_id,
+		"type":       type,
+		"params":     params,
+		"status":     "pending",
+		"retain":     retain,
+		"created_at": Time.get_unix_time_from_system()
+	}
+	_next_queue_id += 1
+	_exec_queue.append(item)
+	if debug_mode:
+		debug_log.emit("[DEBUG] [%s][ext] 入队 #%d type=%s params=%s" % [
+			unit.unit_name if unit != null else "?",
+			item["id"], type, JSON.stringify(params)
+		])
+	_maybe_start_exec()
+	return {"queued_id": item["id"], "queue_size": _exec_queue.size()}
+
+
+func delete_queue_external(target_id: int) -> Dictionary:
+	for item: Dictionary in _exec_queue:
+		if int(item.get("id", -1)) == target_id:
+			if item.get("status") == "completed":
+				return {"skipped": true, "reason": "已完成"}
+			item["status"] = "cancelled"
+			if item.get("type") == "move" and _hex_map != null and unit != null:
+				_hex_map.clear_move_queue(unit.unit_name)
+			return {"cancelled_id": target_id}
+	return {"error": "id %d 未找到" % target_id}
+
+
+func clear_queue_external() -> Dictionary:
+	for item: Dictionary in _exec_queue:
+		if item.get("status") in ["pending", "running"]:
+			item["status"] = "cancelled"
+	if _hex_map != null and _hex_map.has_method("clear_move_queue") and unit != null:
+		_hex_map.clear_move_queue(unit.unit_name)
+	return {"cleared": true}
+
+
+func get_queue_snapshot() -> Array:
+	var out: Array = []
+	for item: Dictionary in _exec_queue:
+		var st: String = item.get("status", "")
+		if st in ["pending", "running"] or (st == "completed" and item.get("retain", false)):
+			out.append(item)
+	return out
 
 
 # ── API trigger ───────────────────────────────────────────────────────────────
@@ -258,9 +363,28 @@ func _execute_tool(fn_name: String, args: Dictionary) -> Dictionary:
 			return {"reachable": true, "path": out, "steps": out.size()}
 
 		"enqueue_action":
+			if _in_battle and args.get("type") == "move":
+				return {"error": "当前正在交战，移动指令已暂停。交战期间请通过战斗指挥系统下令。"}
+			var tp: String = args.get("type", "")
+			# Immediate modify_stats: bypass queue entirely
+			if bool(args.get("immediate", false)) and tp == "modify_stats":
+				if unit == null:
+					return {"error": "单位不可用"}
+				var prms: Dictionary = args.get("params", {})
+				var changes: Dictionary = prms.get("changes", {})
+				var reason: String = prms.get("reason", "")
+				var duration: float = float(prms.get("duration", -1.0))
+				unit.apply_changes(changes)
+				stats_changed.emit({"changes": changes, "reason": reason})
+				if debug_mode:
+					debug_log.emit("[DEBUG] [%s] 立即执行 modify_stats: %s" % [
+						unit.unit_name if unit != null else "?", JSON.stringify(changes)])
+				if duration > 0.0:
+					_start_timed_revert(changes, reason, duration)
+				return {"applied_immediate": true, "changes": changes}
 			var item := {
 				"id":         _next_queue_id,
-				"type":       args.get("type", ""),
+				"type":       tp,
 				"params":     args.get("params", {}),
 				"status":     "pending",
 				"retain":     bool(args.get("retain", false)),
@@ -348,6 +472,17 @@ func _execute_tool(fn_name: String, args: Dictionary) -> Dictionary:
 				ui.on_unit_renamed(old_name, new_name)
 			return {"ok": true, "old_name": old_name, "new_name": new_name}
 
+		"split_unit":
+			var frags: Array = args.get("fragments", [])
+			if frags.size() < 2:
+				return {"error": "至少需要拆分为2个子部队"}
+			var reason: String = args.get("reason", "")
+			var ui2 := get_tree().get_first_node_in_group("commander_ui")
+			if ui2 == null:
+				return {"error": "UI不可用"}
+			var history := get_api_history()
+			return ui2.do_split(unit, self, frags, history)
+
 	return {"error": "未知工具: " + fn_name}
 
 
@@ -419,15 +554,42 @@ func _execute_item(item: Dictionary) -> void:
 				return
 			var changes: Dictionary = p.get("changes", {})
 			var reason: String      = p.get("reason", "")
+			var delay_secs: float   = float(p.get("delay_seconds", 0.0))
+			var duration: float     = float(p.get("duration", -1.0))
+
+			# Wait for delay before applying
+			if delay_secs > 0.0:
+				var elapsed := 0.0
+				while elapsed < delay_secs:
+					if item.get("status") == "cancelled":
+						return
+					var step := minf(delay_secs - elapsed, 1.0)
+					await get_tree().create_timer(step).timeout
+					elapsed += step
+				if item.get("status") == "cancelled":
+					return
+
+			# Apply the stat changes
 			unit.apply_changes(changes)
 			stats_changed.emit({"changes": changes, "reason": reason})
 
-		"speed_buff":
-			var kmh   := float(p.get("kmh", 0.0))
-			var hexes := int(p.get("hexes", 0))
-			if kmh > 0 and hexes > 0 and _hex_map != null and unit != null:
-				_hex_map.apply_speed_buff(unit.unit_name, kmh, hexes)
-				speed_buff_applied.emit(kmh, hexes)
+			if duration < 0.0:
+				# Permanent — mark for retention in queue snapshot
+				item["retain"] = true
+				return
+
+			if duration > 0.0:
+				# Timed — wait, then auto-revert
+				var elapsed := 0.0
+				while elapsed < duration:
+					if item.get("status") == "cancelled":
+						_revert_changes(changes, reason)
+						return
+					var step := minf(duration - elapsed, 1.0)
+					await get_tree().create_timer(step).timeout
+					elapsed += step
+				if item.get("status") != "cancelled":
+					_revert_changes(changes, reason)
 
 		"emit_event":
 			var event_type: String     = p.get("event_type", "timer")
@@ -466,26 +628,53 @@ func _build_system_prompt() -> String:
 
 %s
 
-【坐标系】偶数行不偏移；奇数行右偏半格。方向0=东北 1=东 2=东南 3=西南 4=西 5=西北。格间40km，路上×2，M/W不可通行。
+【坐标系】偶数行不偏移；奇数行右偏半格。方向0=东北 1=东 2=东南 3=西南 4=西 5=西北。格间移动：平地10s/格，道路5s/格（SPEED=10为基准，按比例缩放）；1游戏日=150s。M/W不可通行。
 
 【属性范围】ATK/DEF(0-200) ORG/MORALE/PROF/RECON/STR/STAFF(0-100) SUPPLY(0-7) SPEED(0-20km/h)
 
 【执行队列设计原则】
 - 复杂指令拆分为多个 enqueue_action 按序执行
-- 建设型操作（防御工事等）：enqueue_action(wait, seconds) + enqueue_action(modify_stats, DEF+N, retain=true)
-- retain=true：有持续影响的操作（如DEF增益、SUPPLY变化），完成后留在快照供下次参考
-- 发现快照中有 retain=true 的增益且需要取消时（如移动撤离工事），enqueue_action(modify_stats, 扣回对应值)
+- modify_stats 新参数：delay_seconds=延迟N秒生效（默认0），duration=-1永久，duration>0则N秒后自动还原
+- 建设型操作（防御工事等）：enqueue_action(modify_stats, {DEF:+N, delay_seconds:建造耗时, duration:-1})
+- 临时加成（速度/防御临时强化）：enqueue_action(modify_stats, {STAT:delta, duration:持续秒数})
+- 快照中永久增益需撤销时（如移动撤离工事）：enqueue_action(modify_stats, {STAT:-原delta, duration:-1})
 - 周期任务：enqueue_action(wait) + enqueue_action(emit_event) 实现自循环
 - 移动前须 calculate_path；普通移动不修改属性（除非快照中有待撤销的增益）
-- 急行军/强攻/夜袭才立即扣耗：ORG -5~-20 MORALE -3~-15 STR -2~-5 SUPPLY -0.3~-1
+- 急行军/强攻/夜袭等即时消耗：enqueue_action(modify_stats, immediate=true)——绕过队列立即生效，不等待当前移动结束
 - 与其他部队交互：dispatch_event（目标agent自行决策响应）
 - rename_unit：严禁随意调用；仅当统帅明确下令改名，或部队拆分/合并需要新番号时方可使用
+- split_unit：严禁随意调用；仅当统帅明确下令拆分时方可使用
+- 原子保护：取消 running move 时单位停在当前格中心，可随时重新规划路径
 - 严禁捏造地形，严禁将任何属性归零%s
 
-每次响应最后输出40-100字传令兵叙述，说明本次行动及所有数值变化原因。""" % [unit_name, map_str, rules_section]
+每次响应最后输出40-100字前线电台汇报，说明本次行动及所有数值变化原因。""" % [unit_name, map_str, rules_section]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+func get_api_history() -> Array:
+	return _api.get_history() if _api != null else []
+
+
+func inject_history(history: Array) -> void:
+	if _api != null:
+		_api.inject_history(history)
+
+
+func _start_timed_revert(changes: Dictionary, reason: String, duration: float) -> void:
+	await get_tree().create_timer(duration).timeout
+	_revert_changes(changes, reason)
+
+
+func _revert_changes(changes: Dictionary, original_reason: String) -> void:
+	if unit == null:
+		return
+	var revert: Dictionary = {}
+	for stat in changes.keys():
+		revert[stat] = -float(changes[stat])
+	unit.apply_changes(revert)
+	stats_changed.emit({"changes": revert, "reason": "效果到期/取消：" + original_reason})
+
 
 func _get_unit_pos() -> Vector2i:
 	if _hex_map == null or unit == null:

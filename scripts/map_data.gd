@@ -10,6 +10,8 @@ extends Resource
 @export var spawn_col: int = 8
 @export var spawn_row: int = 8
 @export var cell_region: Array = []
+@export var player_unit_count: int = 2
+@export var enemy_unit_count: int = 2
 
 
 func validate() -> String:

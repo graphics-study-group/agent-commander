@@ -31,11 +31,14 @@ var _roads: Array = []
 var _tile_nodes: Array = []
 var _spawn_col := 8
 var _spawn_row := 8
+var player_unit_count: int = 2
+var enemy_unit_count: int = 2
 
 # unit_name → {unit, col, row, color, marker_root, cylinder, name_label,
 #              hp_bg, hp_fg, move_queue, current_tween, is_moving,
 #              speed_buff_kmh, speed_buff_hexes}
 var _units: Dictionary = {}
+var _frozen_units: Dictionary = {}  # unit_name → true (blocks movement while in battle)
 
 # _cell_region[row][col] = region name string, "" = unnamed
 var _cell_region: Array = []
@@ -47,6 +50,13 @@ var _tooltip: PanelContainer
 var _tooltip_label: RichTextLabel
 
 signal movement_finished(unit_name: String)
+signal hex_coord_selected(col: int, row: int)
+signal unit_collision(mover_name: String, resident_name: String)
+
+var _hovered_hex: Vector2i = Vector2i(-1, -1)
+var _hover_highlight: MeshInstance3D
+var _hover_label: Label3D
+var _highlight_mat: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -61,34 +71,61 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if _tooltip == null:
-		return
 	var camera := get_viewport().get_camera_3d()
 	if camera == null:
+		if _tooltip != null:
+			_tooltip.visible = false
 		return
 	var mouse_pos := get_viewport().get_mouse_position()
-	var closest_unit: Unit = null
-	var closest_dist := 60.0
-	for unit_name: String in _units:
-		var d: Dictionary = _units[unit_name]
-		var mr: Node3D = d.get("marker_root")
-		if not is_instance_valid(mr):
-			continue
-		var screen_pos := camera.unproject_position(mr.global_position + Vector3(0, 1.5, 0))
-		var dist := screen_pos.distance_to(mouse_pos)
-		if dist < closest_dist:
-			closest_dist = dist
-			closest_unit = d.get("unit") as Unit
-	if closest_unit != null:
-		_tooltip.visible = true
-		_tooltip_label.text = closest_unit.get_display_text()
-		var vp := get_viewport().get_visible_rect().size
-		var tp := Vector2(mouse_pos.x + 14.0, mouse_pos.y - _tooltip.size.y - 8.0)
-		tp.x = clamp(tp.x, 4.0, vp.x - _tooltip.size.x - 4.0)
-		tp.y = clamp(tp.y, 4.0, vp.y - _tooltip.size.y - 4.0)
-		_tooltip.position = tp
-	else:
-		_tooltip.visible = false
+
+	# Unit tooltip
+	if _tooltip != null:
+		var closest_unit: Unit = null
+		var closest_dist := 60.0
+		for unit_name: String in _units:
+			var d: Dictionary = _units[unit_name]
+			var mr: Node3D = d.get("marker_root")
+			if not is_instance_valid(mr):
+				continue
+			var screen_pos := camera.unproject_position(mr.global_position + Vector3(0, 1.5, 0))
+			var dist := screen_pos.distance_to(mouse_pos)
+			if dist < closest_dist:
+				closest_dist = dist
+				closest_unit = d.get("unit") as Unit
+		if closest_unit != null:
+			_tooltip.visible = true
+			_tooltip_label.text = closest_unit.get_display_text()
+			var vp := get_viewport().get_visible_rect().size
+			var tp := Vector2(mouse_pos.x + 14.0, mouse_pos.y - _tooltip.size.y - 8.0)
+			tp.x = clamp(tp.x, 4.0, vp.x - _tooltip.size.x - 4.0)
+			tp.y = clamp(tp.y, 4.0, vp.y - _tooltip.size.y - 4.0)
+			_tooltip.position = tp
+		else:
+			_tooltip.visible = false
+
+	# Hex hover: update hovered cell via ray→ground-plane intersection
+	if _hover_highlight != null:
+		var ray_from := camera.project_ray_origin(mouse_pos)
+		var ray_dir  := camera.project_ray_normal(mouse_pos)
+		var show := false
+		if abs(ray_dir.y) > 0.001:
+			var t := -ray_from.y / ray_dir.y
+			if t > 0.0:
+				var hit := ray_from + ray_dir * t
+				var hx  := world_to_hex(hit)
+				if _in_bounds(hx.x, hx.y):
+					_hovered_hex = hx
+					var wpos := hex_to_world(hx.x, hx.y)
+					_hover_highlight.position = Vector3(wpos.x, 1.03, wpos.z)
+					_hover_highlight.visible = true
+					_hover_label.text = "(%d,%d)" % [hx.x, hx.y]
+					_hover_label.position = Vector3(wpos.x, 1.7, wpos.z)
+					_hover_label.visible = true
+					show = true
+		if not show:
+			_hovered_hex = Vector2i(-1, -1)
+			_hover_highlight.visible = false
+			_hover_label.visible = false
 
 
 func _exit_tree() -> void:
@@ -98,12 +135,22 @@ func _exit_tree() -> void:
 
 func _init_refs() -> void:
 	_create_tooltip()
+	_create_hover_overlay()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
+			if _in_bounds(_hovered_hex.x, _hovered_hex.y):
+				hex_coord_selected.emit(_hovered_hex.x, _hovered_hex.y)
 
 
 # ── Unit registration ─────────────────────────────────────────────────────────
 
 func register_unit(unit: Unit, color: Color = Color(0.25, 0.55, 1.0),
-		preferred_col: int = -1, preferred_row: int = -1) -> void:
+		preferred_col: int = -1, preferred_row: int = -1,
+		is_enemy: bool = false) -> void:
 	if unit == null:
 		return
 	var col := preferred_col
@@ -112,12 +159,13 @@ func register_unit(unit: Unit, color: Color = Color(0.25, 0.55, 1.0),
 		var sp := _find_start_pos(preferred_col, preferred_row)
 		col = sp.x
 		row = sp.y
-	var m := _create_unit_marker_node(unit.unit_name, col, row, color)
+	var m := _create_unit_marker_node(unit.unit_name, col, row, color, is_enemy)
 	_units[unit.unit_name] = {
 		"unit": unit,
 		"col": col,
 		"row": row,
 		"color": color,
+		"is_enemy": is_enemy,
 		"marker_root": m["marker_root"],
 		"cylinder": m["cylinder"],
 		"name_label": m["name_label"],
@@ -197,6 +245,8 @@ func load_map_data(data: MapData) -> bool:
 	_init_cell_region()
 	if data.cell_region.size() == _grid_rows:
 		_cell_region = _copy_grid(data.cell_region)
+	player_unit_count = data.player_unit_count
+	enemy_unit_count  = data.enemy_unit_count
 	_rebuild_visuals()
 	return true
 
@@ -210,6 +260,8 @@ func export_map_data() -> MapData:
 	data.roads = _copy_grid(_roads)
 	data.spawn_col = _spawn_col
 	data.spawn_row = _spawn_row
+	data.player_unit_count = player_unit_count
+	data.enemy_unit_count  = enemy_unit_count
 	if not _cell_region.is_empty():
 		data.cell_region = _copy_grid(_cell_region)
 	return data
@@ -559,7 +611,8 @@ func _get_tile_node(col: int, row: int) -> TileBase:
 
 # ── Marker creation ───────────────────────────────────────────────────────────
 
-func _create_unit_marker_node(unit_name: String, col: int, row: int, color: Color) -> Dictionary:
+func _create_unit_marker_node(unit_name: String, col: int, row: int, color: Color,
+		is_enemy: bool = false) -> Dictionary:
 	var root := Node3D.new()
 	root.name = "Marker_" + unit_name
 	root.position = hex_to_world(col, row)
@@ -613,7 +666,12 @@ func _create_unit_marker_node(unit_name: String, col: int, row: int, color: Colo
 	name_lbl.text = unit_name
 	name_lbl.font_size = 48
 	name_lbl.pixel_size = 0.006
-	name_lbl.modulate = Color.WHITE
+	if is_enemy:
+		name_lbl.modulate = Color(1.0, 0.35, 0.35)
+		name_lbl.outline_modulate = Color(0.3, 0.0, 0.0)
+		name_lbl.outline_size = 6
+	else:
+		name_lbl.modulate = Color.WHITE
 	name_lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	name_lbl.no_depth_test = true
 	name_lbl.position = Vector3(0.0, 2.45, 0.0)
@@ -659,14 +717,15 @@ func update_unit_org(unit_name: String, org: float) -> void:
 	var hp_bg: MeshInstance3D = d.get("hp_bg")
 	if not is_instance_valid(hp_fg) or not is_instance_valid(hp_bg):
 		return
-	const W := 0.9   # total bar width (matches QuadMesh size.x)
-	var pct := clampf(org / 100.0, 0.0, 1.0)
-	# Green (left): scale = pct, center shifts so left edge stays fixed at -W/2
-	hp_fg.scale    = Vector3(pct, 1.0, 1.0)
-	hp_fg.position = Vector3((W / 2.0) * (pct - 1.0), 2.1, 0.05)
-	# Dark (right): scale = 1-pct, center shifts so right edge stays fixed at +W/2
-	hp_bg.scale    = Vector3(1.0 - pct, 1.0, 1.0)
-	hp_bg.position = Vector3((W / 2.0) * pct, 2.1, 0.05)
+	const W := 0.9   # total bar width
+	var pct    := clampf(org / 100.0, 0.0, 1.0)
+	var fg_w   := W * pct
+	var bg_w   := W * (1.0 - pct)
+	# Resize meshes directly — avoids billboard/world-scale mismatch
+	(hp_fg.mesh as QuadMesh).size = Vector2(fg_w, 0.10)
+	hp_fg.position = Vector3(-W / 2.0 + fg_w / 2.0, 2.1, 0.05)
+	(hp_bg.mesh as QuadMesh).size = Vector2(bg_w, 0.10)
+	hp_bg.position = Vector3(W / 2.0 - bg_w / 2.0, 2.1, 0.05)
 
 
 # ── Public movement API ───────────────────────────────────────────────────────
@@ -690,6 +749,8 @@ func calc_path(fc: int, fr: int, tc: int, tr: int) -> Array:
 
 
 func set_move_path(unit_name: String, path: Array) -> void:
+	if _frozen_units.has(unit_name):
+		return
 	var d: Dictionary = _units.get(unit_name, {})
 	if d.is_empty() or path.is_empty():
 		return
@@ -705,6 +766,13 @@ func clear_move_queue(unit_name: String) -> void:
 	var tween: Tween = d.get("current_tween")
 	if is_instance_valid(tween) and tween.is_valid():
 		tween.kill()
+		# Before snapping visual, update logical position to nearest hex of current visual position
+		# so that get_unit_pos() and path calculations use the correct starting hex.
+		var marker_root: Node3D = d.get("marker_root") as Node3D
+		if marker_root != null:
+			var nearest := world_to_hex(marker_root.position)
+			d["col"] = nearest.x
+			d["row"] = nearest.y
 	d["current_tween"] = null
 	d["move_queue"] = []
 	if d["is_moving"]:
@@ -718,6 +786,34 @@ func get_unit_pos(unit_name: String) -> Vector2i:
 	if d.is_empty():
 		return Vector2i.ZERO
 	return Vector2i(int(d["col"]), int(d["row"]))
+
+
+func get_unit_is_enemy(unit_name: String) -> bool:
+	var d: Dictionary = _units.get(unit_name, {})
+	return bool(d.get("is_enemy", false))
+
+
+func freeze_unit(unit_name: String) -> void:
+	_frozen_units[unit_name] = true
+	clear_move_queue(unit_name)
+
+
+func unfreeze_unit(unit_name: String) -> void:
+	_frozen_units.erase(unit_name)
+
+
+func find_adjacent_passable(col: int, row: int) -> Vector2i:
+	var dirs := [0, 1, 2, 3, 4, 5]
+	dirs.shuffle()
+	for dir: int in dirs:
+		var nb := get_neighbor(col, row, dir)
+		if not _in_bounds(nb.x, nb.y):
+			continue
+		if _is_impassable(_terrain[nb.y][nb.x]):
+			continue
+		return nb
+	return Vector2i(-1, -1)
+
 
 
 func apply_speed_buff(unit_name: String, extra_kmh: float, hexes: int) -> void:
@@ -737,6 +833,16 @@ func rename_unit(old_name: String, new_name: String) -> void:
 	var lbl: Label3D = d.get("name_label")
 	if is_instance_valid(lbl):
 		lbl.text = new_name
+
+
+func unregister_unit(unit_name: String) -> void:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
+		return
+	var mr: Node3D = d.get("marker_root")
+	if is_instance_valid(mr):
+		mr.queue_free()
+	_units.erase(unit_name)
 
 
 # ── Region system ─────────────────────────────────────────────────────────────
@@ -922,6 +1028,32 @@ func get_position_info(unit_name: String) -> String:
 				TERRAIN_NAMES[_terrain[nb.y][nb.x]], has_road
 			])
 	info += "\n相邻格：" + ", ".join(neighbors)
+
+	# Visible enemy units (opposite faction, within detection range)
+	var self_is_enemy: bool = bool(d.get("is_enemy", false))
+	var self_unit: Unit = d.get("unit") as Unit
+	var recon_range: float = 5.0  # default detection hex radius
+	if self_unit != null:
+		recon_range = maxf(2.0, (self_unit.RECON + self_unit.STAFF) / 10.0)
+	var visible_enemies: Array[String] = []
+	for other_name: String in _units:
+		if other_name == unit_name:
+			continue
+		var od: Dictionary = _units[other_name]
+		if bool(od.get("is_enemy", false)) == self_is_enemy:
+			continue  # same faction
+		var ec: int = int(od["col"])
+		var er: int = int(od["row"])
+		var dist := absf(float(ec - col)) + absf(float(er - row))
+		if dist <= recon_range:
+			var other_unit: Unit = od.get("unit") as Unit
+			var name_str := other_name
+			if other_unit != null:
+				name_str = "%s STR:%.0f%% ORG:%.0f" % [other_name, other_unit.STR, other_unit.ORG]
+			visible_enemies.append("%s 位置(%d,%d)" % [name_str, ec, er])
+	if not visible_enemies.is_empty():
+		info += "\n可见敌军：" + "；".join(visible_enemies)
+
 	return info
 
 
@@ -963,10 +1095,16 @@ func _execute_next_move(unit_name: String) -> void:
 	tween.tween_callback(func():
 		d["col"] = nc
 		d["row"] = nr
-		if int(d["speed_buff_hexes"]) > 0:
-			d["speed_buff_hexes"] = int(d["speed_buff_hexes"]) - 1
-			if int(d["speed_buff_hexes"]) <= 0:
-				d["speed_buff_kmh"] = 0.0
+		# Check for combat collision with opposite-faction unit at same hex
+		var d_is_enemy: bool = bool(d.get("is_enemy", false))
+		for other_name: String in _units:
+			if other_name == unit_name:
+				continue
+			var od: Dictionary = _units[other_name]
+			if int(od["col"]) == nc and int(od["row"]) == nr:
+				if bool(od.get("is_enemy", false)) != d_is_enemy:
+					unit_collision.emit(unit_name, other_name)
+					return  # Stop here; commander_ui will freeze both units
 		_execute_next_move(unit_name)
 	)
 
@@ -974,12 +1112,10 @@ func _execute_next_move(unit_name: String) -> void:
 func _travel_time_for(unit_name: String, fc: int, fr: int, tc: int, tr: int) -> float:
 	var d: Dictionary = _units.get(unit_name, {})
 	var u: Unit = d.get("unit") as Unit
-	var base_spd: float = (u.SPEED if u != null else 4.0) + float(d.get("speed_buff_kmh", 0.0))
-	var spd := maxf(base_spd, 0.1)
+	var spd: float = maxf(u.SPEED if u != null else 10.0, 0.1)
 	var dir := _get_direction(fc, fr, tc, tr)
-	if dir >= 0 and (_roads[fr][fc] & (1 << dir)):
-		spd *= 2.0
-	return HEX_DIST_KM / spd
+	var base := 5.0 if (dir >= 0 and (_roads[fr][fc] & (1 << dir))) else 10.0
+	return base * 10.0 / spd
 
 
 # ── Coordinate labels ─────────────────────────────────────────────────────────
@@ -1012,6 +1148,57 @@ func _create_coord_labels() -> void:
 		pos.y = 0.5
 		lbl.position = pos
 		_generated_root.add_child(lbl)
+
+
+# ── Hover overlay (highlight + coord label) ────────────────────────────────────
+
+func _create_hover_overlay() -> void:
+	var cyl := CylinderMesh.new()
+	cyl.top_radius    = 0.90
+	cyl.bottom_radius = 0.90
+	cyl.height        = 0.02
+	cyl.radial_segments = 6
+	_highlight_mat = StandardMaterial3D.new()
+	_highlight_mat.transparency   = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_highlight_mat.shading_mode   = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_highlight_mat.no_depth_test  = true
+	_highlight_mat.cull_mode      = BaseMaterial3D.CULL_DISABLED
+	_highlight_mat.albedo_color   = Color(0.22, 0.55, 1.0, 0.35)
+	_hover_highlight = MeshInstance3D.new()
+	_hover_highlight.mesh              = cyl
+	_hover_highlight.material_override = _highlight_mat
+	_hover_highlight.visible           = false
+	add_child(_hover_highlight)
+
+	_hover_label = Label3D.new()
+	_hover_label.font_size   = 48
+	_hover_label.pixel_size  = 0.006
+	_hover_label.modulate    = Color(1.0, 1.0, 0.3, 1.0)
+	_hover_label.billboard   = BaseMaterial3D.BILLBOARD_ENABLED
+	_hover_label.no_depth_test = true
+	_hover_label.visible     = false
+	add_child(_hover_label)
+
+
+
+
+func world_to_hex(world_pos: Vector3) -> Vector2i:
+	var cx := (_grid_cols - 1) * H_STEP * 0.5
+	var cz := (_grid_rows - 1) * V_STEP * 0.5
+	var row_f := (world_pos.z + cz) / V_STEP
+	var row: int   = clampi(int(round(row_f)), 0, _grid_rows - 1)
+	var offset := ROW_OFFSET if row % 2 == 1 else 0.0
+	var col_f := (world_pos.x + cx - offset) / H_STEP
+	var col: int   = clampi(int(round(col_f)), 0, _grid_cols - 1)
+	var best  := Vector2i(col, row)
+	var best_d := world_pos.distance_squared_to(hex_to_world(col, row))
+	for r in range(max(0, row - 1), min(_grid_rows, row + 2)):
+		for c in range(max(0, col - 1), min(_grid_cols, col + 2)):
+			var d := world_pos.distance_squared_to(hex_to_world(c, r))
+			if d < best_d:
+				best_d = d
+				best = Vector2i(c, r)
+	return best
 
 
 # ── Tooltip ───────────────────────────────────────────────────────────────────

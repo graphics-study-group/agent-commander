@@ -76,6 +76,8 @@ var _name_regions_btn: Button = null
 var _region_vbox: VBoxContainer = null
 var _file_dialog: FileDialog = null
 var _style_hint_edit: LineEdit = null
+var _player_count_spin: SpinBox = null
+var _enemy_count_spin: SpinBox = null
 
 
 func _ready() -> void:
@@ -480,6 +482,38 @@ func _build_extra_ui() -> void:
 	vbox.add_child(back_btn)
 	vbox.move_child(back_btn, 0)
 
+	# Unit count row — inserted after SizeRow
+	var unit_row := HBoxContainer.new()
+	var pl_lbl := Label.new()
+	pl_lbl.text = "玩家军队:"
+	unit_row.add_child(pl_lbl)
+	_player_count_spin = SpinBox.new()
+	_player_count_spin.min_value = 1
+	_player_count_spin.max_value = 5
+	_player_count_spin.value = _hex_map.player_unit_count if _hex_map != null else 2
+	_player_count_spin.custom_minimum_size = Vector2(70, 0)
+	_player_count_spin.value_changed.connect(func(v: float):
+		if _hex_map != null:
+			_hex_map.player_unit_count = int(v)
+	)
+	unit_row.add_child(_player_count_spin)
+	var en_lbl := Label.new()
+	en_lbl.text = "  敌方军队:"
+	unit_row.add_child(en_lbl)
+	_enemy_count_spin = SpinBox.new()
+	_enemy_count_spin.min_value = 1
+	_enemy_count_spin.max_value = 5
+	_enemy_count_spin.value = _hex_map.enemy_unit_count if _hex_map != null else 2
+	_enemy_count_spin.custom_minimum_size = Vector2(70, 0)
+	_enemy_count_spin.value_changed.connect(func(v: float):
+		if _hex_map != null:
+			_hex_map.enemy_unit_count = int(v)
+	)
+	unit_row.add_child(_enemy_count_spin)
+	vbox.add_child(unit_row)
+	var size_row_idx := $UILayer/EditorUI/VBox/SizeRow.get_index()
+	vbox.move_child(unit_row, size_row_idx + 1)
+
 	# Load button added to SaveRow alongside Save
 	var load_btn := Button.new()
 	load_btn.text = "Load..."
@@ -551,6 +585,10 @@ func _on_file_selected(path: String) -> void:
 			_name_regions_btn.text = "AI: Name Regions"
 		_reset_paint_state()
 		_refresh_region_edit_list()
+		if _player_count_spin != null:
+			_player_count_spin.value = _hex_map.player_unit_count
+		if _enemy_count_spin != null:
+			_enemy_count_spin.value = _hex_map.enemy_unit_count
 	else:
 		_status_label.text = "Failed to load: " + path.get_file()
 

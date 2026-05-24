@@ -54,6 +54,16 @@ func clear_history() -> void:
 	_history.clear()
 
 
+func get_history() -> Array:
+	return _history.duplicate(true)
+
+
+func inject_history(history: Array) -> void:
+	for msg in history:
+		if msg is Dictionary:
+			_history.append((msg as Dictionary).duplicate(true))
+
+
 func get_approx_chars() -> int:
 	var total := _system_prompt.length()
 	for msg: Dictionary in _history:
