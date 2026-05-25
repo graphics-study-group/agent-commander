@@ -10,6 +10,7 @@ var _api: Node
 var _hex_map: Node
 var _units_list: Array  # live reference to commander_ui._units_list
 var _extra_rules: String
+var debug_mode: bool = false: set = _set_debug_mode
 
 const TOOLS: Array = [
 	{
@@ -40,6 +41,12 @@ const TOOLS: Array = [
 ]
 
 
+func _set_debug_mode(value: bool) -> void:
+	debug_mode = value
+	if _api != null:
+		_api.set_system_prompt(_build_system_prompt())
+
+
 func setup(units_list: Array, hex_map: Node, extra_rules: String = "") -> void:
 	_units_list = units_list
 	_hex_map = hex_map
@@ -47,6 +54,7 @@ func setup(units_list: Array, hex_map: Node, extra_rules: String = "") -> void:
 
 	_api = DeepSeekAPI.new()
 	add_child(_api)
+	_api.agent_type = "main_agent"
 	_api.tools = TOOLS
 	_api.response_received.connect(_on_final_response)
 	_api.tool_calls_received.connect(_on_tool_calls)
@@ -147,13 +155,11 @@ func _build_system_prompt() -> String:
 	if not _extra_rules.is_empty():
 		rules_section = "\n\n【裁判额外设定（最高优先级）】\n" + _extra_rules
 
-	return """你是战略统帅指挥部，负责将玩家的全军命令分析后分配给合适的部队执行。当前部队番号：%s
+	var debug_key := "debug_on" if debug_mode else "debug_off"
+	var debug_section := "\n\n" + PromptLoader.get_template("commander_agent", debug_key)
 
-%s【调度原则】
-- 结合各部队位置、状态与地图地形，判断哪些部队应响应本次命令
-- 每支应调动的部队独立调用一次 dispatch_to_unit，传达具体化的命令（各部队并行执行）
-- 若命令仅针对特定区域、条件或部队，只调动符合的部队，不强制全员响应
-- 若命令无需调动任何部队（如纯询问或情况报告），不调用工具
-- 所有 dispatch_to_unit 调用完成后，输出一句30字内的调度摘要%s""" % [
-		", ".join(unit_names), map_str, rules_section
-	]
+	return PromptLoader.get_template("commander_agent", "system") \
+		.replace("{unit_names}", ", ".join(unit_names)) \
+		.replace("{map_str}", map_str) \
+		.replace("{rules_section}", rules_section) \
+		.replace("{debug_section}", debug_section)

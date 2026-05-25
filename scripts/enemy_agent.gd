@@ -6,7 +6,7 @@ signal debug_log(msg: String)
 
 const DeepSeekAPI = preload("res://scripts/deepseek_api.gd")
 const TOKEN_WARN_CHARS := 3_000_000
-const IDLE_REASSESS_INTERVAL := 30.0
+const IDLE_REASSESS_INTERVAL := 30.0  # real wall-clock seconds
 
 var _api: Node
 var _hex_map: Node
@@ -15,10 +15,10 @@ var _player_entries: Array = []  # [{unit, agent, ...}] read-only context
 var _enemy_entries: Array = []   # [{unit, agent}] we command these
 
 var _is_processing: bool = false
-var _idle_game_elapsed: float = 0.0
+var _last_reassess_time: float = 0.0
 var _inbox: Array = []
 var _next_event_id: int = 0
-var debug_mode: bool = false
+var debug_mode: bool = false: set = _set_debug_mode
 
 # ── Tool definitions ──────────────────────────────────────────────────────────
 
@@ -43,7 +43,7 @@ const TOOLS: Array = [
 		"type": "function",
 		"function": {
 			"name": "enqueue_action",
-			"description": "将动作加入指定我方部队的执行队列，或对 modify_stats 立即执行（immediate=true）。\ntype 格式：\n· move         {path:[{col,row},...]}  路径来自 calculate_path\n· wait         {seconds:N}\n· modify_stats {changes:{STAT:delta,...}, reason:\"原因\", delay_seconds:N, duration:N}  delay_seconds=延迟N秒生效；duration=-1永久，duration>0自动还原（严禁归零）\n· emit_event   {event_type:\"类型\", event_info:{}}\nimmediate 仅对 modify_stats 有效：true=绕过队列立即生效（适用于急行军等即时效果）。\nretain 对 move/wait/emit_event 有效；modify_stats 由 duration 自动决定。",
+			"description": "将动作加入指定我方部队的执行队列，或对 modify_stats 立即执行（immediate=true）。\ntype 格式：\n· move         {col:X, row:Y}          移动一格（原子操作）；先 calculate_path 得到路径，再对每一步分别调用一次本工具入队\n· wait         {seconds:N}\n· modify_stats {changes:{STAT:delta,...}, reason:\"原因\", delay_seconds:N, duration:N}  delay_seconds=延迟N秒生效；duration=-1永久，duration>0自动还原（严禁归零）\n· emit_event   {event_type:\"类型\", event_info:{}}\nimmediate 仅对 modify_stats 有效：true=绕过队列立即生效（适用于急行军等即时效果）。\nretain 对 move/wait/emit_event 有效；modify_stats 由 duration 自动决定。",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -61,7 +61,7 @@ const TOOLS: Array = [
 		"type": "function",
 		"function": {
 			"name": "delete_queue_item",
-			"description": "取消指定我方部队执行队列中的某个动作（pending 或 running 均可）。取消 running move 时单位停在当前格中心。",
+			"description": "取消指定我方部队执行队列中的某个 pending 动作。running 动作（原子执行中）无法取消。",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -76,7 +76,7 @@ const TOOLS: Array = [
 		"type": "function",
 		"function": {
 			"name": "clear_exec_queue",
-			"description": "取消指定我方部队队列中所有 pending/running 动作并立即停止移动（单位停在当前格中心）。",
+			"description": "取消指定我方部队队列中所有 pending 动作。running 动作（原子执行中）不受影响，自然完成。",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -122,6 +122,12 @@ const TOOLS: Array = [
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
+func _set_debug_mode(value: bool) -> void:
+	debug_mode = value
+	if _api != null:
+		_api.set_system_prompt(_build_system_prompt())
+
+
 func setup(player_entries: Array, enemy_entries: Array,
 		hex_map: Node, extra_rules: String = "") -> void:
 	_player_entries = player_entries
@@ -131,6 +137,7 @@ func setup(player_entries: Array, enemy_entries: Array,
 
 	_api = DeepSeekAPI.new()
 	add_child(_api)
+	_api.agent_type = "enemy_agent"
 	_api.set_system_prompt(_build_system_prompt())
 	_api.tools = TOOLS
 	_api.response_received.connect(_on_final_response)
@@ -138,7 +145,7 @@ func setup(player_entries: Array, enemy_entries: Array,
 	_api.request_failed.connect(_on_error)
 
 	set_process(true)
-	_idle_game_elapsed = 0.0
+	_last_reassess_time = Time.get_unix_time_from_system()
 
 
 func reload_rules(rules: String) -> void:
@@ -149,7 +156,7 @@ func reload_rules(rules: String) -> void:
 # ── Public event API ──────────────────────────────────────────────────────────
 
 func receive_event(event_type: String, event_info: Dictionary) -> void:
-	_idle_game_elapsed = 0.0
+	_last_reassess_time = Time.get_unix_time_from_system()
 	var event := {
 		"id":        _next_event_id,
 		"type":      event_type,
@@ -164,13 +171,12 @@ func receive_event(event_type: String, event_info: Dictionary) -> void:
 
 # ── Idle reassess timer ───────────────────────────────────────────────────────
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if _is_processing or _api == null:
-		_idle_game_elapsed = 0.0
 		return
-	_idle_game_elapsed += delta
-	if _idle_game_elapsed >= IDLE_REASSESS_INTERVAL:
-		_idle_game_elapsed = 0.0
+	var now := Time.get_unix_time_from_system()
+	if now - _last_reassess_time >= IDLE_REASSESS_INTERVAL:
+		_last_reassess_time = now
 		receive_event("idle_reassess", {"trigger": "30秒无新事件，自动重新评估战场态势"})
 
 
@@ -374,7 +380,7 @@ func _on_error(error: String) -> void:
 func _build_system_prompt() -> String:
 	var map_str := ""
 	if _hex_map != null and _hex_map.has_method("get_map_string"):
-		map_str = _hex_map.get_map_string()
+		map_str = _hex_map.get_map_string() + "\n\n"
 
 	var enemy_names: Array[String] = []
 	for e in _enemy_entries:
@@ -386,23 +392,11 @@ func _build_system_prompt() -> String:
 	if not _extra_rules.is_empty():
 		rules_section = "\n\n【裁判额外设定（最高优先级）】\n" + _extra_rules
 
-	return """你是战略沙盘中的红方（敌方）AI指挥官，统一指挥以下部队：
-%s
-你的目标：击败蓝方（玩家方），占领关键地点，同时保存己方战力。你能看到全局战场信息，包括双方位置与属性。
+	var debug_key := "debug_on" if debug_mode else "debug_off"
+	var debug_section := "\n\n" + PromptLoader.get_template("enemy_agent", debug_key)
 
-%s
-
-【坐标系】偶数行不偏移；奇数行右偏半格。方向0=东北 1=东 2=东南 3=西南 4=西 5=西北。格间移动：平地10s/格，道路5s/格（SPEED=10为基准，按比例缩放）；1游戏日=150s。M/W不可通行。
-
-【属性范围】ATK/DEF(0-200) ORG/MORALE/PROF/RECON/STR/STAFF(0-100) SUPPLY(0-7) SPEED(0-20km/h)
-
-【工具规则】
-- unit_name 必须是己方（红方）部队名称，严禁操作蓝方部队
-- 移动前须先 calculate_path，路径来自返回值
-- 建设型操作（防御工事等）：enqueue_action(wait) + enqueue_action(modify_stats, retain=true)
-- 急行军/强攻：ORG -5~-20 MORALE -3~-15 STR -2~-5 SUPPLY -0.3~-1
-- 严禁捏造地形，严禁将任何属性归零%s
-
-每次响应最后输出40-100字红方战情通报，说明本次战略决策及意图。""" % [
-		"\n".join(enemy_names), map_str, rules_section
-	]
+	return PromptLoader.get_template("enemy_agent", "system") \
+		.replace("{enemy_names}", "\n".join(enemy_names)) \
+		.replace("{map_str}", map_str) \
+		.replace("{rules_section}", rules_section) \
+		.replace("{debug_section}", debug_section)

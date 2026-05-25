@@ -78,6 +78,7 @@ var _file_dialog: FileDialog = null
 var _style_hint_edit: LineEdit = null
 var _player_count_spin: SpinBox = null
 var _enemy_count_spin: SpinBox = null
+var _unit_panel: Control = null
 
 
 func _ready() -> void:
@@ -514,6 +515,54 @@ func _build_extra_ui() -> void:
 	var size_row_idx := $UILayer/EditorUI/VBox/SizeRow.get_index()
 	vbox.move_child(unit_row, size_row_idx + 1)
 
+	# Victory city row
+	var victory_row := HBoxContainer.new()
+	var vc_lbl := Label.new()
+	vc_lbl.text = "胜利目标:"
+	victory_row.add_child(vc_lbl)
+	var vc_col_spin := SpinBox.new()
+	vc_col_spin.min_value = 0
+	vc_col_spin.max_value = 31
+	vc_col_spin.value = 0
+	vc_col_spin.custom_minimum_size = Vector2(58, 0)
+	victory_row.add_child(vc_col_spin)
+	var vc_comma := Label.new()
+	vc_comma.text = ","
+	victory_row.add_child(vc_comma)
+	var vc_row_spin := SpinBox.new()
+	vc_row_spin.min_value = 0
+	vc_row_spin.max_value = 31
+	vc_row_spin.value = 0
+	vc_row_spin.custom_minimum_size = Vector2(58, 0)
+	victory_row.add_child(vc_row_spin)
+	var vc_set_btn := Button.new()
+	vc_set_btn.text = "设定"
+	vc_set_btn.custom_minimum_size = Vector2(40, 0)
+	var vc_clear_btn := Button.new()
+	vc_clear_btn.text = "清除"
+	vc_clear_btn.custom_minimum_size = Vector2(40, 0)
+	victory_row.add_child(vc_set_btn)
+	victory_row.add_child(vc_clear_btn)
+	vc_set_btn.pressed.connect(func():
+		if _hex_map != null and _hex_map.has_method("set_victory_city"):
+			var vc := Vector2i(int(vc_col_spin.value), int(vc_row_spin.value))
+			_hex_map.set_victory_city(vc.x, vc.y)
+			_status_label.text = "胜利目标设为 (%d,%d)" % [vc.x, vc.y]
+	)
+	vc_clear_btn.pressed.connect(func():
+		if _hex_map != null and _hex_map.has_method("set_victory_city"):
+			_hex_map.set_victory_city(-1, -1)
+			_status_label.text = "胜利目标已清除"
+	)
+	# Sync spinboxes when map is clicked (right-click to pick coords)
+	if _hex_map != null and _hex_map.has_signal("hex_coord_selected"):
+		_hex_map.hex_coord_selected.connect(func(col: int, row: int):
+			vc_col_spin.value = col
+			vc_row_spin.value = row
+		)
+	vbox.add_child(victory_row)
+	vbox.move_child(victory_row, size_row_idx + 2)
+
 	# Load button added to SaveRow alongside Save
 	var load_btn := Button.new()
 	load_btn.text = "Load..."
@@ -565,6 +614,14 @@ func _build_extra_ui() -> void:
 	_file_dialog.min_size = Vector2(500, 400)
 	add_child(_file_dialog)
 
+	# Unit attribute editor button
+	var unit_edit_sep := HSeparator.new()
+	vbox.add_child(unit_edit_sep)
+	var unit_edit_btn := Button.new()
+	unit_edit_btn.text = "编辑部队属性"
+	unit_edit_btn.pressed.connect(_open_unit_panel)
+	vbox.add_child(unit_edit_btn)
+
 
 func _on_load_btn_pressed() -> void:
 	DirAccess.make_dir_recursive_absolute(USER_MAP_DIR)
@@ -589,6 +646,9 @@ func _on_file_selected(path: String) -> void:
 			_player_count_spin.value = _hex_map.player_unit_count
 		if _enemy_count_spin != null:
 			_enemy_count_spin.value = _hex_map.enemy_unit_count
+		if _hex_map.has_method("get_victory_city"):
+			var vc: Vector2i = _hex_map.get_victory_city()
+			_status_label.text = "Loaded: " + fname + ("  胜利目标:(%d,%d)" % [vc.x, vc.y] if vc.x >= 0 else "")
 	else:
 		_status_label.text = "Failed to load: " + path.get_file()
 
@@ -785,3 +845,163 @@ func _refresh_region_edit_list() -> void:
 	add_hbox.add_child(add_name)
 	add_hbox.add_child(add_btn)
 	_region_vbox.add_child(add_hbox)
+
+
+# ── Unit attribute editor panel ───────────────────────────────────────────────
+
+func _open_unit_panel() -> void:
+	if is_instance_valid(_unit_panel):
+		_unit_panel.queue_free()
+	_unit_panel = _build_unit_panel()
+	$UILayer.add_child(_unit_panel)
+
+
+func _build_unit_panel() -> Control:
+	var overlay := ColorRect.new()
+	overlay.color = Color(0, 0, 0, 0.55)
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
+	panel.offset_left   = -440.0
+	panel.offset_top    = 20.0
+	panel.offset_right  = -10.0
+	panel.offset_bottom = -20.0
+
+	var outer := VBoxContainer.new()
+	panel.add_child(outer)
+
+	# Title bar
+	var title_row := HBoxContainer.new()
+	var title_lbl := Label.new()
+	title_lbl.text = "部队属性编辑"
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var close_btn := Button.new()
+	close_btn.text = "✕"
+	close_btn.pressed.connect(func(): overlay.queue_free())
+	title_row.add_child(title_lbl)
+	title_row.add_child(close_btn)
+	outer.add_child(title_row)
+	outer.add_child(HSeparator.new())
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	outer.add_child(scroll)
+
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+
+	_populate_unit_list(list)
+
+	overlay.add_child(panel)
+	return overlay
+
+
+func _populate_unit_list(list: VBoxContainer) -> void:
+	if _hex_map == null or not _hex_map.has_method("ensure_unit_templates"):
+		var lbl := Label.new()
+		lbl.text = "无部队数据"
+		list.add_child(lbl)
+		return
+
+	_hex_map.ensure_unit_templates()
+	var templates: Array = _hex_map.get_unit_templates()
+	if templates.is_empty():
+		var lbl := Label.new()
+		lbl.text = "地图上暂无部队"
+		list.add_child(lbl)
+		return
+
+	const STAT_FIELDS := [
+		["ATK", 0.0, 200.0], ["DEF", 0.0, 200.0],
+		["ORG", 0.0, 100.0], ["MORALE", 0.0, 100.0],
+		["PROF", 0.0, 100.0], ["RECON", 0.0, 100.0],
+		["STR", 0.0, 100.0],  ["STAFF", 0.0, 100.0],
+		["SUPPLY", 0.0, 7.0], ["SPEED", 0.0, 20.0],
+	]
+
+	for tmpl: Dictionary in templates:
+		var is_enemy: bool = tmpl.get("is_enemy", false)
+		var faction_color := Color(0.8, 0.2, 0.2) if is_enemy else Color(0.2, 0.5, 1.0)
+
+		# Section header label
+		var hdr := Label.new()
+		hdr.text = ("▶ [红] " if is_enemy else "▶ [蓝] ") + tmpl.get("name", "?")
+		hdr.add_theme_color_override("font_color", faction_color)
+		list.add_child(hdr)
+
+		# Name row
+		var name_row := HBoxContainer.new()
+		var name_lbl := Label.new()
+		name_lbl.text = "番号:"
+		name_lbl.custom_minimum_size = Vector2(40, 0)
+		var name_edit := LineEdit.new()
+		name_edit.text = tmpl.get("name", "")
+		name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_row.add_child(name_lbl)
+		name_row.add_child(name_edit)
+		list.add_child(name_row)
+
+		# Position row
+		var pos_row := HBoxContainer.new()
+		var col_lbl := Label.new()
+		col_lbl.text = "Col:"
+		var col_spin := SpinBox.new()
+		col_spin.min_value = 0
+		col_spin.max_value = 31
+		col_spin.value = int(tmpl.get("col", 0))
+		col_spin.custom_minimum_size = Vector2(64, 0)
+		var row_lbl := Label.new()
+		row_lbl.text = "  Row:"
+		var row_spin := SpinBox.new()
+		row_spin.min_value = 0
+		row_spin.max_value = 31
+		row_spin.value = int(tmpl.get("row", 0))
+		row_spin.custom_minimum_size = Vector2(64, 0)
+		pos_row.add_child(col_lbl)
+		pos_row.add_child(col_spin)
+		pos_row.add_child(row_lbl)
+		pos_row.add_child(row_spin)
+		list.add_child(pos_row)
+
+		# Wire up edits directly into the template dict (it's a reference)
+		var cap := tmpl
+		var cap_hdr := hdr
+		var apply_name := func():
+			var new_name := name_edit.text.strip_edges()
+			if new_name.is_empty():
+				return
+			cap["name"] = new_name
+			cap_hdr.text = ("▶ [红] " if is_enemy else "▶ [蓝] ") + new_name
+		name_edit.focus_exited.connect(apply_name)
+		name_edit.text_submitted.connect(func(_t): apply_name.call())
+
+		col_spin.value_changed.connect(func(v: float): cap["col"] = int(v))
+		row_spin.value_changed.connect(func(v: float): cap["row"] = int(v))
+
+		# Stats grid (4 columns: label + spin, label + spin)
+		var grid := GridContainer.new()
+		grid.columns = 4
+		for field_def in STAT_FIELDS:
+			var stat_name: String = field_def[0]
+			var s_min: float      = field_def[1]
+			var s_max: float      = field_def[2]
+
+			var s_lbl := Label.new()
+			s_lbl.text = stat_name + ":"
+			s_lbl.custom_minimum_size = Vector2(52, 0)
+			var s_spin := SpinBox.new()
+			s_spin.min_value = s_min
+			s_spin.max_value = s_max
+			s_spin.step = 0.5 if stat_name == "SUPPLY" else 1.0
+			s_spin.value = float(cap.get(stat_name, 0.0))
+			s_spin.custom_minimum_size = Vector2(72, 0)
+
+			var cap_stat := stat_name
+			s_spin.value_changed.connect(func(v: float): cap[cap_stat] = v)
+			grid.add_child(s_lbl)
+			grid.add_child(s_spin)
+		list.add_child(grid)
+		list.add_child(HSeparator.new())

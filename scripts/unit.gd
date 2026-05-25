@@ -17,16 +17,16 @@ extends Resource
 func get_display_text() -> String:
 	return (
 		"[b]%s[/b]\n"
-		+ "攻击(ATK): [color=red]%.0f[/color]    防御(DEF): [color=cyan]%.0f[/color]\n"
-		+ "组织(ORG): [color=lime]%.0f[/color]    士气(MORALE): [color=yellow]%.0f[/color]\n"
-		+ "熟练(PROF): %.0f    侦察(RECON): %.0f\n"
-		+ "兵力(STR): %.0f%%    补给(SUPPLY): %.1f/7\n"
-		+ "速度(SPEED): %.0f    参谋(STAFF): %.0f"
+		+ "攻击力（ATK）: [color=red]%.0f[/color]    防御力（DEF）: [color=cyan]%.0f[/color]\n"
+		+ "组织度（ORG）: [color=lime]%.0f[/color]    士气（MORALE）: [color=yellow]%.0f[/color]\n"
+		+ "熟练度（PROF）: %.0f    侦察力（RECON）: %.0f\n"
+		+ "兵力（STR）: %.0f%%    补给值（SUPPLY）: %.1f/7\n"
+		+ "速度（SPEED）: %.0f    参谋（STAFF）: %.0f"
 	) % [unit_name, ATK, DEF, ORG, MORALE, PROF, RECON, STR, SUPPLY, SPEED, STAFF]
 
 
 func get_state_summary() -> String:
-	return "部队[%s] ATK:%.0f DEF:%.0f ORG:%.0f MORALE:%.0f PROF:%.0f RECON:%.0f STR:%.0f%% SUPPLY:%.1f/7 SPEED:%.0f STAFF:%.0f" % [
+	return "部队[%s] 攻击力（ATK）:%.0f 防御力（DEF）:%.0f 组织度（ORG）:%.0f 士气（MORALE）:%.0f 熟练度（PROF）:%.0f 侦察力（RECON）:%.0f 兵力（STR）:%.0f%% 补给值（SUPPLY）:%.1f/7 速度（SPEED）:%.0f 参谋（STAFF）:%.0f" % [
 		unit_name, ATK, DEF, ORG, MORALE, PROF, RECON, STR, SUPPLY, SPEED, STAFF
 	]
 

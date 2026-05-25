@@ -19,8 +19,13 @@ var _is_processing: bool = false
 var _exec_running: bool = false
 var _next_event_id: int = 0
 var _next_queue_id: int = 0
-var debug_mode: bool = false
+var debug_mode: bool = false: set = _set_debug_mode
 var _in_battle: bool = false
+
+var _is_collapsed: bool = false
+var _collapse_elapsed: float = 0.0
+var _recover_timer: float = 0.0
+var _debug_update_elapsed: float = 0.0
 
 # ── Tool definitions ──────────────────────────────────────────────────────────
 
@@ -44,7 +49,7 @@ const TOOLS: Array = [
 		"type": "function",
 		"function": {
 			"name": "enqueue_action",
-			"description": "将动作加入执行队列按序执行，或对 modify_stats 立即执行（immediate=true）。\ntype 及对应 params 格式：\n· move         {path:[{col,row},...]}  路径来自 calculate_path\n· wait         {seconds:N}             等待N秒\n· modify_stats {changes:{STAT:delta,...}, reason:\"原因\", delay_seconds:N, duration:N}  修改属性；delay_seconds=延迟N秒生效（默认0）；duration=-1永久，duration>0则N秒后自动还原（严禁归零）\n· emit_event   {event_type:\"类型\", event_info:{}}  完成后向自身发送事件（可实现周期任务）\nimmediate 仅对 modify_stats 有效：true=绕过队列立即生效（适用于急行军、临阵强化等即时效果）。\nretain 对 move/wait/emit_event 有效；modify_stats 的保留状态由 duration 自动决定。",
+			"description": "将动作加入执行队列按序执行，或对 modify_stats 立即执行（immediate=true）。\ntype 及对应 params 格式：\n· move         {col:X, row:Y}          移动一格（原子操作）；先用 calculate_path 得到完整路径，再对每一步分别调用一次本工具入队\n· wait         {seconds:N}             等待N秒\n· modify_stats {changes:{STAT:delta,...}, reason:\"原因\", delay_seconds:N, duration:N}  修改属性；delay_seconds=延迟N秒生效（默认0）；duration=-1永久，duration>0则N秒后自动还原（严禁归零）\n· emit_event   {event_type:\"类型\", event_info:{}}  完成后向自身发送事件（可实现周期任务）\nimmediate 仅对 modify_stats 有效：true=绕过队列立即生效（适用于急行军、临阵强化等即时效果）。\nretain 对 move/wait/emit_event 有效；modify_stats 的保留状态由 duration 自动决定。",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -61,7 +66,7 @@ const TOOLS: Array = [
 		"type": "function",
 		"function": {
 			"name": "delete_queue_item",
-			"description": "取消执行队列中指定 id 的动作（pending 或 running 均可）。取消 running move 时单位停在当前格中心。",
+			"description": "取消执行队列中指定 id 的 pending 动作。running 动作（原子执行中）无法取消——请查看队列快照确认 pending 状态再调用。",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -75,7 +80,7 @@ const TOOLS: Array = [
 		"type": "function",
 		"function": {
 			"name": "clear_exec_queue",
-			"description": "取消执行队列中所有 pending/running 动作并立即停止移动（单位停在当前格中心）。",
+			"description": "取消执行队列中所有 pending 动作。running 动作（原子执行中）不受影响，会自然完成。",
 			"parameters": {"type": "object", "properties": {}}
 		}
 	},
@@ -156,6 +161,12 @@ const TOOLS: Array = [
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
+
+func _set_debug_mode(value: bool) -> void:
+	debug_mode = value
+	if _api != null:
+		_api.set_system_prompt(_build_system_prompt())
+
 func setup(p_unit: Unit, hex_map: Node, extra_rules: String = "") -> void:
 	unit         = p_unit
 	_hex_map     = hex_map
@@ -163,6 +174,7 @@ func setup(p_unit: Unit, hex_map: Node, extra_rules: String = "") -> void:
 
 	_api = DeepSeekAPI.new()
 	add_child(_api)
+	_api.agent_type = "sub_agent"
 	_api.set_system_prompt(_build_system_prompt())
 	_api.tools = TOOLS
 	_api.response_received.connect(_on_final_response)
@@ -170,11 +182,64 @@ func setup(p_unit: Unit, hex_map: Node, extra_rules: String = "") -> void:
 	_api.request_failed.connect(_on_error)
 
 	add_to_group("unit_agent")
+	set_process(true)
 
 
 func reload_rules(rules: String) -> void:
 	_extra_rules = rules
 	_api.set_system_prompt(_build_system_prompt())
+
+
+func _process(delta: float) -> void:
+	_recover_org(delta)
+	if debug_mode:
+		_debug_update_elapsed += delta
+		if _debug_update_elapsed >= 0.5:
+			_debug_update_elapsed = 0.0
+			_push_debug_text()
+
+
+func _recover_org(delta: float) -> void:
+	if unit == null or _in_battle:
+		return
+	if unit.ORG >= 80.0:
+		_recover_timer = 0.0
+		return
+	var rate: float
+	if _is_collapsed:
+		_collapse_elapsed += delta
+		rate = 0.1
+		if _collapse_elapsed >= 60.0:
+			_is_collapsed = false
+	else:
+		rate = (5.0 + unit.PROF) * 0.03
+	if _hex_map != null and _hex_map.has_method("get_tile_type_at"):
+		var pos := _get_unit_pos()
+		if _hex_map.get_tile_type_at(pos.x, pos.y) == 4:
+			rate *= 3.0
+	_recover_timer += delta
+	if _recover_timer >= 1.0:
+		var gain := minf(rate * _recover_timer, 80.0 - unit.ORG)
+		_recover_timer = 0.0
+		if gain > 0.001:
+			unit.ORG = unit.ORG + gain
+			if _hex_map != null and _hex_map.has_method("update_unit_org"):
+				_hex_map.update_unit_org(unit.unit_name, unit.ORG)
+
+
+func _push_debug_text() -> void:
+	if _hex_map == null or unit == null:
+		return
+	if not _hex_map.has_method("set_unit_debug_text"):
+		return
+	var snapshot := get_queue_snapshot()
+	if snapshot.is_empty():
+		_hex_map.set_unit_debug_text(unit.unit_name, "空")
+		return
+	var parts: Array[String] = []
+	for item: Dictionary in snapshot:
+		parts.append("#%d[%s]%s" % [item.get("id", 0), item.get("status", ""), item.get("type", "")])
+	_hex_map.set_unit_debug_text(unit.unit_name, ", ".join(parts))
 
 
 func enter_battle(battle_id: String) -> void:
@@ -187,6 +252,9 @@ func enter_battle(battle_id: String) -> void:
 
 func exit_battle(outcome: String, battle_id: String) -> void:
 	_in_battle = false
+	if outcome == "defeat":
+		_is_collapsed = true
+		_collapse_elapsed = 0.0
 	receive_event("combat_ended", {"battle_id": battle_id, "outcome": outcome})
 
 
@@ -243,21 +311,19 @@ func enqueue_external(type: String, params: Dictionary, retain: bool = false) ->
 func delete_queue_external(target_id: int) -> Dictionary:
 	for item: Dictionary in _exec_queue:
 		if int(item.get("id", -1)) == target_id:
+			if item.get("status") == "running":
+				return {"error": "正在执行（原子性保护），无法取消"}
 			if item.get("status") == "completed":
 				return {"skipped": true, "reason": "已完成"}
 			item["status"] = "cancelled"
-			if item.get("type") == "move" and _hex_map != null and unit != null:
-				_hex_map.clear_move_queue(unit.unit_name)
 			return {"cancelled_id": target_id}
 	return {"error": "id %d 未找到" % target_id}
 
 
 func clear_queue_external() -> Dictionary:
 	for item: Dictionary in _exec_queue:
-		if item.get("status") in ["pending", "running"]:
+		if item.get("status") == "pending":
 			item["status"] = "cancelled"
-	if _hex_map != null and _hex_map.has_method("clear_move_queue") and unit != null:
-		_hex_map.clear_move_queue(unit.unit_name)
 	return {"cleared": true}
 
 
@@ -405,20 +471,18 @@ func _execute_tool(fn_name: String, args: Dictionary) -> Dictionary:
 			var target_id := int(args.get("id", -1))
 			for item: Dictionary in _exec_queue:
 				if int(item.get("id", -1)) == target_id:
+					if item.get("status") == "running":
+						return {"error": "正在执行（原子性保护），无法取消"}
 					if item.get("status") == "completed":
 						return {"skipped": true, "reason": "已完成，无需取消"}
 					item["status"] = "cancelled"
-					if item.get("type") == "move" and _hex_map != null and unit != null:
-						_hex_map.clear_move_queue(unit.unit_name)
 					return {"cancelled_id": target_id}
 			return {"error": "id %d 未找到" % target_id}
 
 		"clear_exec_queue":
 			for item: Dictionary in _exec_queue:
-				if item.get("status") in ["pending", "running"]:
+				if item.get("status") == "pending":
 					item["status"] = "cancelled"
-			if _hex_map != null and _hex_map.has_method("clear_move_queue") and unit != null:
-				_hex_map.clear_move_queue(unit.unit_name)
 			return {"cleared": true}
 
 		"dispatch_event":
@@ -525,15 +589,11 @@ func _execute_item(item: Dictionary) -> void:
 		"move":
 			if _hex_map == null or not _hex_map.has_method("set_move_path") or unit == null:
 				return
-			var raw: Array = p.get("path", [])
-			var steps: Array = []
-			for step in raw:
-				if step is Dictionary:
-					steps.append([int(step.get("col", 0)), int(step.get("row", 0))])
-			if steps.is_empty():
-				return
-			_hex_map.set_move_path(unit.unit_name, steps)
-			# Wait specifically for this unit's movement to finish
+			if _hex_map.has_method("is_unit_frozen") and _hex_map.is_unit_frozen(unit.unit_name):
+				return  # Frozen (in battle); LLM will replan after combat_ended event
+			var col := int(p.get("col", 0))
+			var row := int(p.get("row", 0))
+			_hex_map.set_move_path(unit.unit_name, [[col, row]])
 			while true:
 				var emitted_name: String = await _hex_map.movement_finished
 				if emitted_name == unit.unit_name:
@@ -579,17 +639,7 @@ func _execute_item(item: Dictionary) -> void:
 				return
 
 			if duration > 0.0:
-				# Timed — wait, then auto-revert
-				var elapsed := 0.0
-				while elapsed < duration:
-					if item.get("status") == "cancelled":
-						_revert_changes(changes, reason)
-						return
-					var step := minf(duration - elapsed, 1.0)
-					await get_tree().create_timer(step).timeout
-					elapsed += step
-				if item.get("status") != "cancelled":
-					_revert_changes(changes, reason)
+				_start_timed_revert(changes, reason, duration)
 
 		"emit_event":
 			var event_type: String     = p.get("event_type", "timer")
@@ -623,31 +673,13 @@ func _build_system_prompt() -> String:
 	var rules_section := ""
 	if not _extra_rules.is_empty():
 		rules_section = "\n\n【裁判额外设定（最高优先级）】\n" + _extra_rules
-
-	return """你是战略沙盘中「%s」的AI指挥官。你是事件驱动型agent：平时待机，有事件到来时被唤醒，思考后将行动加入执行队列，最后输出战场叙述。
-
-%s
-
-【坐标系】偶数行不偏移；奇数行右偏半格。方向0=东北 1=东 2=东南 3=西南 4=西 5=西北。格间移动：平地10s/格，道路5s/格（SPEED=10为基准，按比例缩放）；1游戏日=150s。M/W不可通行。
-
-【属性范围】ATK/DEF(0-200) ORG/MORALE/PROF/RECON/STR/STAFF(0-100) SUPPLY(0-7) SPEED(0-20km/h)
-
-【执行队列设计原则】
-- 复杂指令拆分为多个 enqueue_action 按序执行
-- modify_stats 新参数：delay_seconds=延迟N秒生效（默认0），duration=-1永久，duration>0则N秒后自动还原
-- 建设型操作（防御工事等）：enqueue_action(modify_stats, {DEF:+N, delay_seconds:建造耗时, duration:-1})
-- 临时加成（速度/防御临时强化）：enqueue_action(modify_stats, {STAT:delta, duration:持续秒数})
-- 快照中永久增益需撤销时（如移动撤离工事）：enqueue_action(modify_stats, {STAT:-原delta, duration:-1})
-- 周期任务：enqueue_action(wait) + enqueue_action(emit_event) 实现自循环
-- 移动前须 calculate_path；普通移动不修改属性（除非快照中有待撤销的增益）
-- 急行军/强攻/夜袭等即时消耗：enqueue_action(modify_stats, immediate=true)——绕过队列立即生效，不等待当前移动结束
-- 与其他部队交互：dispatch_event（目标agent自行决策响应）
-- rename_unit：严禁随意调用；仅当统帅明确下令改名，或部队拆分/合并需要新番号时方可使用
-- split_unit：严禁随意调用；仅当统帅明确下令拆分时方可使用
-- 原子保护：取消 running move 时单位停在当前格中心，可随时重新规划路径
-- 严禁捏造地形，严禁将任何属性归零%s
-
-每次响应最后输出40-100字前线电台汇报，说明本次行动及所有数值变化原因。""" % [unit_name, map_str, rules_section]
+	var debug_key := "debug_on" if debug_mode else "debug_off"
+	var debug_section := "\n\n" + PromptLoader.get_template("unit_agent", debug_key)
+	return PromptLoader.get_template("unit_agent", "system") \
+		.replace("{unit_name}", unit_name) \
+		.replace("{map_str}", map_str) \
+		.replace("{rules_section}", rules_section) \
+		.replace("{debug_section}", debug_section)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

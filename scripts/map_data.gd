@@ -12,6 +12,9 @@ extends Resource
 @export var cell_region: Array = []
 @export var player_unit_count: int = 2
 @export var enemy_unit_count: int = 2
+@export var victory_city_col: int = -1
+@export var victory_city_row: int = -1
+@export var unit_templates: Array = []  # Array of Dicts: {name, is_enemy, col, row, ATK, DEF, ORG, MORALE, PROF, RECON, STR, STAFF, SUPPLY, SPEED}
 
 
 func validate() -> String:

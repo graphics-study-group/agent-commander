@@ -18,12 +18,25 @@ var _enemy_entries: Array = []
 var _target_option: OptionButton = null
 var _debug_mode: bool = false
 
-# battle_id → {agent, attacker_name, defender_name, attacker_is_player}
+# battle_id → {agent, attacker_units: Array[String], defender_units: Array[String], attacker_is_player, col, row}
 var _active_battles: Dictionary = {}
 # unit_name → real_unfreeze_time (winner cleanup pause)
 var _battle_cleanup_timers: Dictionary = {}
 
 var _unit_select_group := ButtonGroup.new()
+
+# Supply convoy system
+# {id, target_unit, is_player, col, row, path, path_idx, step_elapsed}
+var _convoys: Array = []
+var _next_convoy_id: int = 0
+var _supply_day_elapsed: float = 0.0
+
+# Victory condition
+var _initial_enemy_str: float = 0.0
+var _victory_occupation_time: float = 0.0
+var _victory_achieved: bool = false
+var _game_over: bool = false
+var _initial_player_str: float = 0.0
 
 @onready var _stats_container: VBoxContainer = $UnitStatsContainer
 @onready var _output:          RichTextLabel = $OutputContainer/OutputText
@@ -152,12 +165,20 @@ func _setup_agent() -> void:
 		player_count = maxi(1, hex_map.player_unit_count)
 		enemy_count  = maxi(1, hex_map.enemy_unit_count)
 
+	# Load templates (populated from map data, or auto-generated defaults)
+	var templates: Array = []
+	if hex_map != null and hex_map.has_method("ensure_unit_templates"):
+		hex_map.ensure_unit_templates()
+		templates = hex_map.get_unit_templates()
+
+	var player_tmpls := templates.filter(func(t): return not bool(t.get("is_enemy", false)))
+	var enemy_tmpls  := templates.filter(func(t): return bool(t.get("is_enemy", false)))
+
 	# ── Player units ──
-	var player_color  := Color(0.25, 0.55, 1.0)
-	var player_rows   := _spread_start_rows(player_count)
+	var player_color := Color(0.25, 0.55, 1.0)
 
 	for i in range(player_count):
-		var u := _make_player_unit(i)
+		var u := _unit_from_template(player_tmpls, i, false)
 		_units_list.append({
 			"unit": u, "agent": null, "color": player_color,
 			"stat_label": null, "select_btn": null, "collapse_btn": null, "panel_hbox": null
@@ -168,10 +189,13 @@ func _setup_agent() -> void:
 	for i in range(_units_list.size()):
 		var entry: Dictionary = _units_list[i]
 		var unit: Unit        = entry["unit"]
-		var row: int          = player_rows[i] if i < player_rows.size() else 8
+		var tmpl: Dictionary  = player_tmpls[i] if i < player_tmpls.size() else {}
+		var col: int          = int(tmpl.get("col", 0))
+		var row: int          = int(tmpl.get("row", (4 + i * 3) % 16))
 
 		if hex_map != null and hex_map.has_method("register_unit"):
-			hex_map.register_unit(unit, player_color, 4, row, false)
+			hex_map.register_unit(unit, player_color, col, row, false)
+		entry["spawn_pos"] = Vector2i(col, row)
 
 		var agent: Node = UnitAgentScript.new()
 		add_child(agent)
@@ -234,14 +258,16 @@ func _setup_agent() -> void:
 
 	# ── Enemy units ──
 	var enemy_color := Color(0.85, 0.15, 0.15)
-	var enemy_rows  := _spread_start_rows(enemy_count)
+	var max_col: int = (hex_map.get_map_size().x - 1) if (hex_map != null and hex_map.has_method("get_map_size")) else 15
 
 	for i in range(enemy_count):
-		var eu   := _make_enemy_unit(i)
-		var erow: int = enemy_rows[i] if i < enemy_rows.size() else 8
+		var eu := _unit_from_template(enemy_tmpls, i, true)
+		var etmpl: Dictionary = enemy_tmpls[i] if i < enemy_tmpls.size() else {}
+		var ecol: int = int(etmpl.get("col", max_col))
+		var erow: int = int(etmpl.get("row", (4 + i * 3) % 16))
 
 		if hex_map != null and hex_map.has_method("register_unit"):
-			hex_map.register_unit(eu, enemy_color, 11, erow, true)
+			hex_map.register_unit(eu, enemy_color, ecol, erow, true)
 
 		var eagent: Node = UnitAgentScript.new()
 		add_child(eagent)
@@ -253,9 +279,21 @@ func _setup_agent() -> void:
 				hex_map.update_unit_org(eu.unit_name, eu.ORG)
 		)
 
-		_enemy_entries.append({"unit": eu, "agent": eagent})
+		_enemy_entries.append({"unit": eu, "agent": eagent, "spawn_pos": Vector2i(max_col, erow)})
 
 	# ── Enemy agent ──
+	_initial_enemy_str = 0.0
+	for entry in _enemy_entries:
+		var eu: Unit = entry.get("unit") as Unit
+		if eu != null:
+			_initial_enemy_str += eu.STR
+
+	_initial_player_str = 0.0
+	for entry in _units_list:
+		var pu: Unit = entry.get("unit") as Unit
+		if pu != null:
+			_initial_player_str += pu.STR
+
 	_enemy_agent = EnemyAgentScript.new()
 	add_child(_enemy_agent)
 	_enemy_agent.setup(_units_list, _enemy_entries, hex_map, _load_rules())
@@ -284,12 +322,34 @@ func _setup_agent() -> void:
 
 # ── Unit factory helpers ──────────────────────────────────────────────────────
 
+func _unit_from_template(tmpls: Array, i: int, is_enemy: bool) -> Unit:
+	var u := Unit.new()
+	if i < tmpls.size():
+		var t: Dictionary = tmpls[i]
+		u.unit_name = t.get("name", ("红%d部" % (i + 1)) if is_enemy else ("第%d部队" % (i + 1)))
+		u.ATK = float(t.get("ATK", 68.0 if is_enemy else 70.0))
+		u.DEF = float(t.get("DEF", 58.0 if is_enemy else 60.0))
+		u.ORG = float(t.get("ORG", 80.0 if is_enemy else 85.0))
+		u.MORALE = float(t.get("MORALE", 70.0 if is_enemy else 72.0))
+		u.PROF = float(t.get("PROF", 60.0 if is_enemy else 63.0))
+		u.RECON = float(t.get("RECON", 48.0 if is_enemy else 45.0))
+		u.STR = float(t.get("STR", 85.0 if is_enemy else 88.0))
+		u.SUPPLY = float(t.get("SUPPLY", 3.0))
+		u.SPEED = float(t.get("SPEED", 5.0 if is_enemy else 4.5))
+		u.STAFF = float(t.get("STAFF", 50.0 if is_enemy else 52.0))
+	elif is_enemy:
+		u = _make_enemy_unit(i)
+	else:
+		u = _make_player_unit(i)
+	return u
+
+
 func _make_player_unit(i: int) -> Unit:
 	var names := ["第1装甲旅", "第2机步旅", "第3步兵旅", "第4炮兵旅", "第5特战旅"]
 	var u := Unit.new()
 	u.unit_name = names[i] if i < names.size() else ("第%d部队" % (i + 1))
 	u.ATK = 70.0; u.DEF = 60.0; u.ORG = 85.0; u.MORALE = 72.0
-	u.PROF = 63.0; u.RECON = 45.0; u.STR = 88.0; u.SUPPLY = 6.5
+	u.PROF = 63.0; u.RECON = 45.0; u.STR = 88.0; u.SUPPLY = 3.0
 	u.SPEED = 4.5; u.STAFF = 52.0
 	return u
 
@@ -299,7 +359,7 @@ func _make_enemy_unit(i: int) -> Unit:
 	var u := Unit.new()
 	u.unit_name = names[i] if i < names.size() else ("红%d部" % (i + 1))
 	u.ATK = 68.0; u.DEF = 58.0; u.ORG = 80.0; u.MORALE = 70.0
-	u.PROF = 60.0; u.RECON = 48.0; u.STR = 85.0; u.SUPPLY = 5.5
+	u.PROF = 60.0; u.RECON = 48.0; u.STR = 85.0; u.SUPPLY = 3.0
 	u.SPEED = 5.0; u.STAFF = 50.0
 	return u
 
@@ -487,12 +547,18 @@ func _on_send() -> void:
 	# Slash commands
 	if msg == "/debug":
 		_debug_mode = not _debug_mode
+		var dbg_hex_map := get_tree().get_first_node_in_group("hex_map")
+		if dbg_hex_map != null:
+			dbg_hex_map.debug_mode = _debug_mode
 		for entry: Dictionary in _units_list:
 			var a: Node = entry["agent"]
 			if a != null:
 				a.debug_mode = _debug_mode
 		if _enemy_agent != null:
 			_enemy_agent.debug_mode = _debug_mode
+		if _commander_agent != null and _commander_agent.has_method("reload_rules"):
+			_commander_agent.debug_mode = _debug_mode
+			_commander_agent.reload_rules(_load_rules())
 		var state := "开启" if _debug_mode else "关闭"
 		_append("[color=gray][系统] DEBUG模式已%s[/color]" % state)
 		return
@@ -641,33 +707,50 @@ func _format_changes(unit: Unit, changes: Dictionary) -> String:
 	return "  ".join(parts)
 
 
-# ── _process: unfreeze winner after cleanup pause ────────────────────────────
+# ── _process ─────────────────────────────────────────────────────────────────
 
-func _process(_delta: float) -> void:
-	if _battle_cleanup_timers.is_empty():
+func _process(delta: float) -> void:
+	# Winner cleanup timers (wall-clock)
+	if not _battle_cleanup_timers.is_empty():
+		var now := Time.get_unix_time_from_system()
+		var to_unfreeze: Array = []
+		for unit_name: String in _battle_cleanup_timers:
+			if now >= float(_battle_cleanup_timers[unit_name]):
+				to_unfreeze.append(unit_name)
+		for unit_name: String in to_unfreeze:
+			_battle_cleanup_timers.erase(unit_name)
+			var hm := get_tree().get_first_node_in_group("hex_map")
+			if hm != null and hm.has_method("unfreeze_unit"):
+				hm.unfreeze_unit(unit_name)
+
+	# Supply day (game time)
+	_supply_day_elapsed += delta
+	if _supply_day_elapsed >= 150.0:
+		_supply_day_elapsed -= 150.0
+		_on_supply_day()
+
+	# Advance convoys
+	_advance_convoys(delta)
+
+	# Victory condition
+	if _game_over:
 		return
-	var now := Time.get_unix_time_from_system()
-	var to_unfreeze: Array = []
-	for unit_name: String in _battle_cleanup_timers:
-		if now >= float(_battle_cleanup_timers[unit_name]):
-			to_unfreeze.append(unit_name)
-	for unit_name: String in to_unfreeze:
-		_battle_cleanup_timers.erase(unit_name)
-		var hex_map := get_tree().get_first_node_in_group("hex_map")
-		if hex_map != null and hex_map.has_method("unfreeze_unit"):
-			hex_map.unfreeze_unit(unit_name)
+	if not _victory_achieved:
+		_check_victory(delta)
 
 
 # ── Combat collision handler ──────────────────────────────────────────────────
 
 func _on_unit_collision(mover_name: String, resident_name: String) -> void:
-	# Deduplicate: skip if either unit is already in a battle
-	for bid: String in _active_battles:
-		var b: Dictionary = _active_battles[bid]
-		if mover_name in [b["attacker_name"], b["defender_name"]]:
-			return
-		if resident_name in [b["attacker_name"], b["defender_name"]]:
-			return
+	# If mover is already in a battle (shouldn't happen since frozen, but guard anyway)
+	if not _get_battle_id_for_unit(mover_name).is_empty():
+		return
+	# If resident is in a battle, mover is reinforcing
+	var existing_bid := _get_battle_id_for_unit(resident_name)
+	if not existing_bid.is_empty():
+		_reinforce_battle(existing_bid, mover_name)
+		return
+	# New battle
 	_start_battle(mover_name, resident_name)
 
 
@@ -691,7 +774,7 @@ func _start_battle(attacker_name: String, defender_name: String) -> void:
 	var ba: Node = BattleAgentScript.new()
 	add_child(ba)
 	ba.battle_id = bid
-	ba.setup(atk_unit, def_unit, atk_is_player, def_is_player,
+	ba.setup([atk_unit], [def_unit], atk_is_player, def_is_player,
 		battle_pos.x, battle_pos.y, hex_map, _load_rules())
 
 	ba.combat_report.connect(_on_combat_report)
@@ -701,9 +784,11 @@ func _start_battle(attacker_name: String, defender_name: String) -> void:
 
 	_active_battles[bid] = {
 		"agent":            ba,
-		"attacker_name":    attacker_name,
-		"defender_name":    defender_name,
-		"attacker_is_player": atk_is_player
+		"attacker_units":   [attacker_name],
+		"defender_units":   [defender_name],
+		"attacker_is_player": atk_is_player,
+		"col":              battle_pos.x,
+		"row":              battle_pos.y
 	}
 
 	# Freeze both units on the map
@@ -741,85 +826,139 @@ func _start_battle(attacker_name: String, defender_name: String) -> void:
 	ba.start()
 
 
+func _reinforce_battle(battle_id: String, mover_name: String) -> void:
+	var b: Dictionary = _active_battles.get(battle_id, {})
+	if b.is_empty():
+		return
+	var ba: Node = b.get("agent") as Node
+	if ba == null:
+		return
+	var mover_unit := _find_any_unit(mover_name)
+	if mover_unit == null:
+		return
+
+	var hex_map := get_tree().get_first_node_in_group("hex_map")
+
+	# Determine which side mover joins (same faction = same side)
+	var mover_is_player := _is_player_unit(mover_name)
+	var attacker_is_player: bool = b.get("attacker_is_player", false)
+	var is_attacker_side := (mover_is_player == attacker_is_player)
+
+	if is_attacker_side:
+		b["attacker_units"].append(mover_name)
+	else:
+		b["defender_units"].append(mover_name)
+
+	# Freeze reinforcing unit
+	if hex_map != null and hex_map.has_method("freeze_unit"):
+		hex_map.freeze_unit(mover_name)
+
+	# Notify unit_agent
+	var mover_agent := _find_any_agent(mover_name)
+	if mover_agent != null and mover_agent.has_method("enter_battle"):
+		mover_agent.enter_battle(battle_id)
+
+	# Notify battle_agent
+	if ba.has_method("reinforce"):
+		ba.reinforce(mover_unit, is_attacker_side)
+
+	# Notify enemy agent
+	if _enemy_agent != null:
+		var side_str := "进攻方" if is_attacker_side else "防御方"
+		_enemy_agent.receive_event("combat_reinforcement", {
+			"battle_id": battle_id,
+			"unit_name": mover_name,
+			"side":      "attacker" if is_attacker_side else "defender",
+			"message":   "部队 %s 加入了战斗 %s 的%s。" % [mover_name, battle_id, side_str]
+		})
+
+	var mover_side_lbl := "蓝方" if mover_is_player else "红方"
+	var side_lbl := "进攻方" if is_attacker_side else "防御方"
+	_append("\n[color=orange][⚔ 增援到达][/color] %s（%s）加入 %s" % [mover_name, mover_side_lbl, side_lbl])
+
+
 func _on_combat_report(battle_id: String, narrative: String) -> void:
 	_append("\n[color=orange][战报·%s][/color] %s" % [battle_id, narrative])
-	# Refresh stat labels for both battle participants
 	var b: Dictionary = _active_battles.get(battle_id, {})
 	if not b.is_empty():
-		_refresh_stat_label_for(b.get("attacker_name", ""))
-		_refresh_stat_label_for(b.get("defender_name", ""))
+		for n: String in b.get("attacker_units", []):
+			_refresh_stat_label_for(n)
+		for n: String in b.get("defender_units", []):
+			_refresh_stat_label_for(n)
 
 
-func _on_combat_ended(battle_id: String, winner_name: String) -> void:
+func _on_combat_ended(battle_id: String, winner_side: String) -> void:
 	var b: Dictionary = _active_battles.get(battle_id, {})
 	if b.is_empty():
 		return
 
-	var attacker_name: String = b["attacker_name"]
-	var defender_name: String = b["defender_name"]
-	var loser_name := ""
-	if winner_name == "draw":
-		loser_name = ""
-	elif winner_name == attacker_name:
-		loser_name = defender_name
-	else:
-		loser_name = attacker_name
+	var attacker_units: Array = b.get("attacker_units", [])
+	var defender_units: Array = b.get("defender_units", [])
+	var all_units: Array = attacker_units + defender_units
+
+	var winner_units: Array
+	var loser_units: Array
+	match winner_side:
+		"attacker":
+			winner_units = attacker_units.duplicate()
+			loser_units  = defender_units.duplicate()
+		"defender":
+			winner_units = defender_units.duplicate()
+			loser_units  = attacker_units.duplicate()
+		_:  # draw
+			winner_units = []
+			loser_units  = []
 
 	var hex_map := get_tree().get_first_node_in_group("hex_map")
-	var battle_pos := Vector2i.ZERO
-	if hex_map != null and hex_map.has_method("get_unit_pos"):
-		battle_pos = hex_map.get_unit_pos(attacker_name)
+	var battle_col: int = b.get("col", 0)
+	var battle_row: int = b.get("row", 0)
 
-	# Notify unit agents of battle result
-	var outcome_atk := "victory" if winner_name == attacker_name else ("draw" if winner_name == "draw" else "defeat")
-	var outcome_def := "victory" if winner_name == defender_name else ("draw" if winner_name == "draw" else "defeat")
-	var atk_agent := _find_any_agent(attacker_name)
-	var def_agent := _find_any_agent(defender_name)
-	if atk_agent != null and atk_agent.has_method("exit_battle"):
-		atk_agent.exit_battle(outcome_atk, battle_id)
-	if def_agent != null and def_agent.has_method("exit_battle"):
-		def_agent.exit_battle(outcome_def, battle_id)
+	for unit_name: String in all_units:
+		var is_winner := unit_name in winner_units
+		var is_draw   := winner_side == "draw"
+		var outcome   := "draw" if is_draw else ("victory" if is_winner else "defeat")
 
-	# Unfreeze winner immediately; winner gets a cleanup pause before they can move
-	var winner_agent := _find_any_agent(winner_name) if winner_name != "draw" else null
-	if not loser_name.is_empty():
-		# Unfreeze loser, move to adjacent hex, apply speed boost
-		if hex_map != null and hex_map.has_method("unfreeze_unit"):
-			hex_map.unfreeze_unit(loser_name)
-		var adj := Vector2i(-1, -1)
-		if hex_map != null and hex_map.has_method("find_adjacent_passable"):
-			adj = hex_map.find_adjacent_passable(battle_pos.x, battle_pos.y)
-		if adj != Vector2i(-1, -1) and hex_map != null and hex_map.has_method("set_move_path"):
-			hex_map.set_move_path(loser_name, [[adj.x, adj.y]])
-		# Speed boost for loser (game time duration ~20s)
-		var loser_agent := _find_any_agent(loser_name)
-		if loser_agent != null and loser_agent.has_method("enqueue_external"):
-			loser_agent.enqueue_external("modify_stats",
-				{"changes": {"SPEED": 5}, "reason": "撤退加速", "duration": 20.0})
+		var agent := _find_any_agent(unit_name)
+		if agent != null and agent.has_method("exit_battle"):
+			agent.exit_battle(outcome, battle_id)
 
-		# Winner stays still for 5 real seconds (cleanup pause)
-		if hex_map != null and hex_map.has_method("freeze_unit") and winner_name != "draw":
-			hex_map.freeze_unit(winner_name)
-			_battle_cleanup_timers[winner_name] = Time.get_unix_time_from_system() + 5.0
-	else:
-		# Draw: unfreeze both
-		if hex_map != null and hex_map.has_method("unfreeze_unit"):
-			hex_map.unfreeze_unit(attacker_name)
-			hex_map.unfreeze_unit(defender_name)
+		if is_draw:
+			if hex_map != null and hex_map.has_method("unfreeze_unit"):
+				hex_map.unfreeze_unit(unit_name)
+		elif is_winner:
+			# Winners: freeze briefly then auto-unfreeze
+			if hex_map != null and hex_map.has_method("freeze_unit"):
+				hex_map.freeze_unit(unit_name)
+			_battle_cleanup_timers[unit_name] = Time.get_unix_time_from_system() + 5.0
+		else:
+			# Losers: unfreeze, retreat to separate random adjacent hex, speed boost
+			if hex_map != null and hex_map.has_method("unfreeze_unit"):
+				hex_map.unfreeze_unit(unit_name)
+			var adj := Vector2i(-1, -1)
+			if hex_map != null and hex_map.has_method("find_adjacent_passable"):
+				adj = hex_map.find_adjacent_passable(battle_col, battle_row)
+			if adj != Vector2i(-1, -1) and hex_map != null and hex_map.has_method("set_move_path"):
+				hex_map.set_move_path(unit_name, [[adj.x, adj.y]])
+			if agent != null and agent.has_method("apply_stats_immediate"):
+				agent.apply_stats_immediate({
+					"changes": {"SPEED": 5}, "reason": "撤退加速", "duration": 20.0
+				})
 
 	# Notify enemy agent
 	if _enemy_agent != null:
 		_enemy_agent.receive_event("combat_update", {
-			"battle_id": battle_id,
-			"winner":    winner_name,
-			"message":   "战斗结束，胜者：%s" % winner_name
+			"battle_id":    battle_id,
+			"winner_side":  winner_side,
+			"winner_units": winner_units,
+			"loser_units":  loser_units,
+			"message":      "战斗 %s 结束，胜方：%s" % [battle_id, winner_side]
 		})
 
-	# Refresh stat labels
-	_refresh_stat_label_for(attacker_name)
-	_refresh_stat_label_for(defender_name)
+	for unit_name: String in all_units:
+		_refresh_stat_label_for(unit_name)
 
-	# Clean up
+	_append("\n[color=orange][⚔ 战斗结束][/color] 胜方：%s" % winner_side)
+
 	var ba: Node = b.get("agent") as Node
 	_active_battles.erase(battle_id)
 	if ba != null:
@@ -852,9 +991,17 @@ func forward_enemy_combat_order(battle_id: String, unit_name: String, order: Str
 func _get_battle_for_unit(unit_name: String) -> Dictionary:
 	for bid: String in _active_battles:
 		var b: Dictionary = _active_battles[bid]
-		if unit_name in [b["attacker_name"], b["defender_name"]]:
+		if unit_name in b.get("attacker_units", []) or unit_name in b.get("defender_units", []):
 			return b
 	return {}
+
+
+func _get_battle_id_for_unit(unit_name: String) -> String:
+	for bid: String in _active_battles:
+		var b: Dictionary = _active_battles[bid]
+		if unit_name in b.get("attacker_units", []) or unit_name in b.get("defender_units", []):
+			return bid
+	return ""
 
 
 # ── Unit lookup helpers ───────────────────────────────────────────────────────
@@ -899,3 +1046,247 @@ func _refresh_stat_label_for(unit_name: String) -> void:
 			if lbl != null and is_instance_valid(lbl):
 				lbl.text = u.get_display_text()
 			return
+
+
+# ── Supply convoy system ──────────────────────────────────────────────────────
+
+func _on_supply_day() -> void:
+	var hex_map := get_tree().get_first_node_in_group("hex_map")
+	# Consume SUPPLY for all units
+	for entry: Dictionary in _units_list:
+		var u: Unit = entry.get("unit") as Unit
+		if u != null:
+			u.SUPPLY = maxf(0.0, u.SUPPLY - 1.0)
+			var lbl: RichTextLabel = entry.get("stat_label") as RichTextLabel
+			if is_instance_valid(lbl):
+				lbl.text = u.get_display_text()
+	for entry: Dictionary in _enemy_entries:
+		var u: Unit = entry.get("unit") as Unit
+		if u != null:
+			u.SUPPLY = maxf(0.0, u.SUPPLY - 1.0)
+	# Spawn convoys
+	for entry: Dictionary in _units_list:
+		var u: Unit = entry.get("unit") as Unit
+		if u != null:
+			_spawn_convoy(u, true, entry, hex_map)
+	for entry: Dictionary in _enemy_entries:
+		var u: Unit = entry.get("unit") as Unit
+		if u != null:
+			_spawn_convoy(u, false, entry, hex_map)
+
+
+func _spawn_convoy(target_unit: Unit, is_player: bool, entry: Dictionary, hex_map: Node) -> void:
+	if hex_map == null or not hex_map.has_method("calc_path"):
+		return
+	var spawn_pos: Vector2i = entry.get("spawn_pos", Vector2i(-1, -1))
+	if spawn_pos == Vector2i(-1, -1):
+		return
+	var target_pos: Vector2i = hex_map.get_unit_pos(target_unit.unit_name)
+	# Verify path exists
+	var path: Array = hex_map.calc_path(spawn_pos.x, spawn_pos.y, target_pos.x, target_pos.y)
+	if path.is_empty() and not (spawn_pos == target_pos):
+		return
+	var convoy_id := _next_convoy_id
+	_next_convoy_id += 1
+	_convoys.append({
+		"id":               convoy_id,
+		"target_unit_name": target_unit.unit_name,
+		"is_player":        is_player,
+		"col":              spawn_pos.x,
+		"row":              spawn_pos.y,
+		"step_elapsed":     0.0
+	})
+	if hex_map.has_method("add_convoy_marker"):
+		var convoy_color := Color(0.25, 0.55, 1.0) if is_player else Color(0.85, 0.15, 0.15)
+		hex_map.add_convoy_marker(str(convoy_id), spawn_pos.x, spawn_pos.y, convoy_color)
+
+
+func _advance_convoys(game_delta: float) -> void:
+	if _convoys.is_empty():
+		return
+	var hex_map := get_tree().get_first_node_in_group("hex_map")
+	if hex_map == null or not hex_map.has_method("calc_path"):
+		return
+
+	var to_remove: Array = []
+
+	for convoy: Dictionary in _convoys:
+		# Check if any enemy is already on this convoy hex (unit walked onto it)
+		var cur_col_c := int(convoy["col"])
+		var cur_row_c := int(convoy["row"])
+		var is_player_c: bool = convoy["is_player"]
+		var interceptors_c := _enemy_entries if is_player_c else _units_list
+		var instant_intercepted := false
+		for ientry: Dictionary in interceptors_c:
+			var iu: Unit = ientry.get("unit") as Unit
+			if iu == null: continue
+			var ipos: Vector2i = hex_map.get_unit_pos(iu.unit_name)
+			if ipos.x == cur_col_c and ipos.y == cur_row_c:
+				iu.SUPPLY = minf(7.0, iu.SUPPLY + 1.0)
+				to_remove.append(convoy)
+				instant_intercepted = true
+				break
+		if instant_intercepted:
+			continue
+		convoy["step_elapsed"] = float(convoy.get("step_elapsed", 0.0)) + game_delta
+		if float(convoy["step_elapsed"]) < 10.0:
+			continue
+		convoy["step_elapsed"] = 0.0
+
+		var target_unit := _find_any_unit(convoy["target_unit_name"])
+		if target_unit == null:
+			to_remove.append(convoy)
+			continue
+
+		var cur_col := int(convoy["col"])
+		var cur_row := int(convoy["row"])
+		var target_pos: Vector2i = hex_map.get_unit_pos(target_unit.unit_name)
+
+		# Already at target — deliver
+		if cur_col == target_pos.x and cur_row == target_pos.y:
+			target_unit.SUPPLY = minf(7.0, target_unit.SUPPLY + 1.0)
+			_refresh_stat_label_for(target_unit.unit_name)
+			to_remove.append(convoy)
+			continue
+
+		# Calculate next step
+		var path: Array = hex_map.calc_path(cur_col, cur_row, target_pos.x, target_pos.y)
+		if path.is_empty():
+			to_remove.append(convoy)
+			continue
+
+		# Determine next cell (path may or may not include current pos)
+		var step_idx := 0
+		if path.size() > 0:
+			var first = path[0]
+			if int(first[0]) == cur_col and int(first[1]) == cur_row:
+				step_idx = 1
+		if step_idx >= path.size():
+			to_remove.append(convoy)
+			continue
+
+		var nxt = path[step_idx]
+		var next_col := int(nxt[0])
+		var next_row := int(nxt[1])
+
+		convoy["col"] = next_col
+		convoy["row"] = next_row
+		if hex_map.has_method("update_convoy_marker"):
+			hex_map.update_convoy_marker(str(convoy["id"]), next_col, next_row)
+
+		# Check interception by enemy units at new position
+		var is_player: bool = convoy["is_player"]
+		var interceptors := _enemy_entries if is_player else _units_list
+		var intercepted := false
+		for ientry: Dictionary in interceptors:
+			var iu: Unit = ientry.get("unit") as Unit
+			if iu == null:
+				continue
+			var ipos: Vector2i = hex_map.get_unit_pos(iu.unit_name)
+			if ipos.x == next_col and ipos.y == next_row:
+				iu.SUPPLY = minf(7.0, iu.SUPPLY + 1.0)
+				intercepted = true
+				to_remove.append(convoy)
+				break
+		if intercepted:
+			continue
+
+		# Check if reached target
+		if next_col == target_pos.x and next_row == target_pos.y:
+			target_unit.SUPPLY = minf(7.0, target_unit.SUPPLY + 1.0)
+			_refresh_stat_label_for(target_unit.unit_name)
+			to_remove.append(convoy)
+
+	for convoy: Dictionary in to_remove:
+		_convoys.erase(convoy)
+		if hex_map.has_method("remove_convoy_marker"):
+			hex_map.remove_convoy_marker(str(convoy["id"]))
+
+
+# ── Victory condition ─────────────────────────────────────────────────────────
+
+func _check_victory(delta: float) -> void:
+	var hex_map := get_tree().get_first_node_in_group("hex_map")
+	if hex_map == null or not hex_map.has_method("get_victory_city"):
+		return
+	var victory_city: Vector2i = hex_map.get_victory_city()
+	if victory_city == Vector2i(-1, -1):
+		return
+
+	var player_at_city := false
+	for entry: Dictionary in _units_list:
+		var u: Unit = entry.get("unit") as Unit
+		if u == null: continue
+		if hex_map.get_unit_pos(u.unit_name) == victory_city and _get_battle_id_for_unit(u.unit_name).is_empty():
+			player_at_city = true
+			break
+
+	var enemy_at_city := false
+	for entry: Dictionary in _enemy_entries:
+		var u: Unit = entry.get("unit") as Unit
+		if u == null: continue
+		if hex_map.get_unit_pos(u.unit_name) == victory_city and _get_battle_id_for_unit(u.unit_name).is_empty():
+			enemy_at_city = true
+			break
+
+	if player_at_city:
+		_victory_occupation_time += delta
+		if _victory_occupation_time >= 1050.0:
+			var enemy_str: float = 0.0
+			for e: Dictionary in _enemy_entries:
+				var u: Unit = e.get("unit") as Unit
+				if u != null: enemy_str += u.STR
+			if _initial_enemy_str > 0.0 and enemy_str < _initial_enemy_str * 0.5:
+				_trigger_game_over("blue")
+	elif enemy_at_city:
+		_victory_occupation_time -= delta
+		if _victory_occupation_time <= -1050.0:
+			var player_str: float = 0.0
+			for e: Dictionary in _units_list:
+				var u: Unit = e.get("unit") as Unit
+				if u != null: player_str += u.STR
+			if _initial_player_str > 0.0 and player_str < _initial_player_str * 0.5:
+				_trigger_game_over("red")
+	else:
+		_victory_occupation_time = move_toward(_victory_occupation_time, 0.0, delta)
+
+
+func _trigger_game_over(winner: String) -> void:
+	_victory_achieved = true
+	_game_over = true
+	_send_btn.disabled = true
+	if _target_option != null:
+		_target_option.disabled = true
+	var label: String = "蓝方胜利" if winner == "blue" else "红方胜利"
+	_show_victory_overlay(label)
+
+
+func _show_victory_overlay(label_text: String) -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 10
+	get_tree().root.add_child(layer)
+
+	var panel := ColorRect.new()
+	panel.color = Color(0.0, 0.0, 0.0, 0.72)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 32)
+	layer.add_child(vbox)
+
+	var lbl := Label.new()
+	lbl.text = label_text
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var is_blue := label_text.begins_with("蓝")
+	lbl.add_theme_color_override("font_color", Color(0.3, 0.7, 1.0) if is_blue else Color(1.0, 0.3, 0.3))
+	lbl.add_theme_font_size_override("font_size", 72)
+	vbox.add_child(lbl)
+
+	var btn := Button.new()
+	btn.text = "返回主菜单"
+	btn.custom_minimum_size = Vector2(200, 60)
+	btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+	vbox.add_child(btn)

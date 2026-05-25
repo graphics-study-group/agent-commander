@@ -1,6 +1,7 @@
 extends Node
 
 const API_URL := "https://api.deepseek.com/chat/completions"
+const TOKEN_LOG_PATH := "token_usage.log"
 
 static func _load_api_key() -> String:
 	var fa := FileAccess.open("res://api_key.txt", FileAccess.READ)
@@ -12,10 +13,15 @@ static func _load_api_key() -> String:
 	return key
 
 var _api_key: String = ""
+var agent_type: String = "unknown"
+var model: String = "deepseek-chat"
+var max_tool_rounds: int = 25
+var history_window: int = 0  # 0 = unlimited; >0 = keep last N messages before dispatch
 
 var _http: HTTPRequest
 var _history: Array[Dictionary] = []
 var _system_prompt: String = ""
+var _tool_round: int = 0
 var tools: Array = []   # set before send_message to enable function-calling
 
 signal response_received(content: String)
@@ -32,19 +38,22 @@ func _ready() -> void:
 
 func set_system_prompt(prompt: String) -> void:
 	_system_prompt = prompt
-	_history.clear()
 
 
 func send_message(user_content: String) -> void:
 	if _api_key.is_empty():
 		request_failed.emit("API Key 未填写，请在项目根目录放置 api_key.txt")
 		return
+	_tool_round = 0
 	_history.append({"role": "user", "content": user_content})
 	_dispatch()
 
 
 func send_tool_results(results: Array) -> void:
-	# Each result: {role:"tool", tool_call_id:..., name:..., content:...}
+	_tool_round += 1
+	if _tool_round >= max_tool_rounds:
+		request_failed.emit("工具调用轮次超限（%d轮），终止对话" % max_tool_rounds)
+		return
 	for r in results:
 		_history.append(r)
 	_dispatch()
@@ -52,6 +61,7 @@ func send_tool_results(results: Array) -> void:
 
 func clear_history() -> void:
 	_history.clear()
+	_tool_round = 0
 
 
 func get_history() -> Array:
@@ -77,10 +87,13 @@ func _dispatch() -> void:
 	var messages: Array = []
 	if not _system_prompt.is_empty():
 		messages.append({"role": "system", "content": _system_prompt})
-	messages.append_array(_history)
+	if history_window > 0 and _history.size() > history_window:
+		messages.append_array(_history.slice(_history.size() - history_window))
+	else:
+		messages.append_array(_history)
 
 	var payload_dict: Dictionary = {
-		"model": "deepseek-chat",
+		"model": model,
 		"messages": messages,
 		"stream": false
 	}
@@ -122,6 +135,14 @@ func _on_completed(result: int, code: int, _headers: PackedStringArray,
 	var message: Dictionary = choice["message"]
 	var finish_reason: String = choice.get("finish_reason", "stop")
 
+	# Token usage logging
+	var usage: Dictionary = (data as Dictionary).get("usage", {})
+	var in_chars: int = int(usage.get("prompt_tokens", 0)) * 3
+	var out_chars: int = int(usage.get("completion_tokens", 0)) * 3
+	if in_chars == 0:
+		in_chars = get_approx_chars()
+	_append_token_log(in_chars, out_chars)
+
 	if finish_reason == "tool_calls":
 		# Store the full assistant message (includes tool_calls array)
 		_history.append(message)
@@ -130,3 +151,16 @@ func _on_completed(result: int, code: int, _headers: PackedStringArray,
 		var content: String = message.get("content", "")
 		_history.append({"role": "assistant", "content": content})
 		response_received.emit(content)
+
+
+func _append_token_log(in_chars: int, out_chars: int) -> void:
+	var log_path := ProjectSettings.globalize_path("res://") + TOKEN_LOG_PATH
+	var fa := FileAccess.open(log_path, FileAccess.READ_WRITE)
+	if fa == null:
+		fa = FileAccess.open(log_path, FileAccess.WRITE)
+	if fa == null:
+		return
+	fa.seek_end()
+	var ts := Time.get_datetime_string_from_system(false, true)
+	fa.store_line("%s [%s] in:%d out:%d" % [ts, agent_type, in_chars, out_chars])
+	fa.close()

@@ -39,6 +39,7 @@ var enemy_unit_count: int = 2
 #              speed_buff_kmh, speed_buff_hexes}
 var _units: Dictionary = {}
 var _frozen_units: Dictionary = {}  # unit_name → true (blocks movement while in battle)
+var _unit_templates: Array = []     # Array[Dictionary] — initial unit configs saved with map
 
 # _cell_region[row][col] = region name string, "" = unnamed
 var _cell_region: Array = []
@@ -57,6 +58,14 @@ var _hovered_hex: Vector2i = Vector2i(-1, -1)
 var _hover_highlight: MeshInstance3D
 var _hover_label: Label3D
 var _highlight_mat: StandardMaterial3D
+
+var debug_mode: bool = false
+var _unit_debug_texts: Dictionary = {}  # unit_name → queue string
+
+var _victory_city: Vector2i = Vector2i(-1, -1)
+var _victory_city_marker: Node3D = null
+
+var _convoy_markers: Dictionary = {}  # convoy_id → Node3D marker_root
 
 
 func _ready() -> void:
@@ -94,7 +103,10 @@ func _process(_delta: float) -> void:
 				closest_unit = d.get("unit") as Unit
 		if closest_unit != null:
 			_tooltip.visible = true
-			_tooltip_label.text = closest_unit.get_display_text()
+			var text := closest_unit.get_display_text()
+			if debug_mode and _unit_debug_texts.has(closest_unit.unit_name):
+				text += "\n[color=gray]【队列】%s[/color]" % _unit_debug_texts[closest_unit.unit_name]
+			_tooltip_label.text = text
 			var vp := get_viewport().get_visible_rect().size
 			var tp := Vector2(mouse_pos.x + 14.0, mouse_pos.y - _tooltip.size.y - 8.0)
 			tp.x = clamp(tp.x, 4.0, vp.x - _tooltip.size.x - 4.0)
@@ -247,6 +259,8 @@ func load_map_data(data: MapData) -> bool:
 		_cell_region = _copy_grid(data.cell_region)
 	player_unit_count = data.player_unit_count
 	enemy_unit_count  = data.enemy_unit_count
+	_victory_city = Vector2i(data.victory_city_col, data.victory_city_row)
+	_unit_templates = data.unit_templates.duplicate(true)
 	_rebuild_visuals()
 	return true
 
@@ -264,6 +278,9 @@ func export_map_data() -> MapData:
 	data.enemy_unit_count  = enemy_unit_count
 	if not _cell_region.is_empty():
 		data.cell_region = _copy_grid(_cell_region)
+	data.victory_city_col = _victory_city.x
+	data.victory_city_row = _victory_city.y
+	data.unit_templates = _unit_templates.duplicate(true)
 	return data
 
 
@@ -305,6 +322,7 @@ func _rebuild_visuals() -> void:
 	_recreate_all_markers()
 	_create_coord_labels()
 	refresh_region_labels()
+	_rebuild_victory_marker()
 
 
 func _clear_generated_root() -> void:
@@ -795,11 +813,27 @@ func get_unit_is_enemy(unit_name: String) -> bool:
 
 func freeze_unit(unit_name: String) -> void:
 	_frozen_units[unit_name] = true
-	clear_move_queue(unit_name)
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
+		return
+	d["move_queue"] = []
+	if not d.get("is_moving", false):
+		return
+	# If no active tween (unit just arrived, collision detected before _execute_next_move)
+	# emit movement_finished to unblock the exec_queue runner
+	var tween: Tween = d.get("current_tween") as Tween
+	if not (is_instance_valid(tween) and tween.is_valid()):
+		d["is_moving"] = false
+		movement_finished.emit(unit_name)
+	# else: tween still running (defender mid-step); tween callback will emit when done
 
 
 func unfreeze_unit(unit_name: String) -> void:
 	_frozen_units.erase(unit_name)
+
+
+func is_unit_frozen(unit_name: String) -> bool:
+	return _frozen_units.has(unit_name)
 
 
 func find_adjacent_passable(col: int, row: int) -> Vector2i:
@@ -833,6 +867,66 @@ func rename_unit(old_name: String, new_name: String) -> void:
 	var lbl: Label3D = d.get("name_label")
 	if is_instance_valid(lbl):
 		lbl.text = new_name
+
+
+func teleport_unit(unit_name: String, col: int, row: int) -> void:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
+		return
+	var tween = d.get("current_tween")
+	if tween != null and tween is Tween:
+		tween.kill()
+		d["current_tween"] = null
+	d["is_moving"] = false
+	d["col"] = col
+	d["row"] = row
+	_update_marker_pos_for(unit_name)
+
+
+func get_all_units_info() -> Array:
+	var result: Array = []
+	for unit_name: String in _units:
+		var d: Dictionary = _units[unit_name]
+		var u: Unit = d.get("unit") as Unit
+		if u == null:
+			continue
+		result.append({
+			"unit":     u,
+			"col":      int(d.get("col", 0)),
+			"row":      int(d.get("row", 0)),
+			"is_enemy": bool(d.get("is_enemy", false))
+		})
+	result.sort_custom(func(a, b): return int(a["is_enemy"]) < int(b["is_enemy"]))
+	return result
+
+
+func get_unit_templates() -> Array:
+	return _unit_templates
+
+
+func ensure_unit_templates() -> void:
+	if not _unit_templates.is_empty():
+		return
+	var player_names := ["第1装甲旅", "第2机步旅", "第3步兵旅", "第4炮兵旅", "第5特战旅"]
+	var enemy_names  := ["赤甲一部", "赤甲二部", "赤甲三部", "赤甲四部", "赤甲五部"]
+	for i in range(player_unit_count):
+		_unit_templates.append({
+			"name": player_names[i] if i < player_names.size() else ("第%d部队" % (i + 1)),
+			"is_enemy": false,
+			"col": 0, "row": (4 + i * 3) % _grid_rows,
+			"ATK": 70.0, "DEF": 60.0, "ORG": 85.0, "MORALE": 72.0,
+			"PROF": 63.0, "RECON": 45.0, "STR": 88.0, "SUPPLY": 3.0,
+			"SPEED": 4.5, "STAFF": 52.0
+		})
+	for i in range(enemy_unit_count):
+		_unit_templates.append({
+			"name": enemy_names[i] if i < enemy_names.size() else ("红%d部" % (i + 1)),
+			"is_enemy": true,
+			"col": _grid_cols - 1, "row": (4 + i * 3) % _grid_rows,
+			"ATK": 68.0, "DEF": 58.0, "ORG": 80.0, "MORALE": 70.0,
+			"PROF": 60.0, "RECON": 48.0, "STR": 85.0, "SUPPLY": 3.0,
+			"SPEED": 5.0, "STAFF": 50.0
+		})
 
 
 func unregister_unit(unit_name: String) -> void:
@@ -955,7 +1049,7 @@ func refresh_region_labels() -> void:
 		lbl.modulate = Color(1.0, 0.85, 0.3, 0.5)
 		lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		lbl.no_depth_test = true
-		lbl.position = Vector3(cx, 0.3, cz)
+		lbl.position = Vector3(cx, 0.8, cz)
 		_region_labels_root.add_child(lbl)
 
 
@@ -1095,6 +1189,12 @@ func _execute_next_move(unit_name: String) -> void:
 	tween.tween_callback(func():
 		d["col"] = nc
 		d["row"] = nr
+		d["current_tween"] = null
+		# If frozen (battle started while this step was animating): stop here
+		if _frozen_units.has(unit_name):
+			d["is_moving"] = false
+			movement_finished.emit(unit_name)
+			return
 		# Check for combat collision with opposite-faction unit at same hex
 		var d_is_enemy: bool = bool(d.get("is_enemy", false))
 		for other_name: String in _units:
@@ -1104,7 +1204,7 @@ func _execute_next_move(unit_name: String) -> void:
 			if int(od["col"]) == nc and int(od["row"]) == nr:
 				if bool(od.get("is_enemy", false)) != d_is_enemy:
 					unit_collision.emit(unit_name, other_name)
-					return  # Stop here; commander_ui will freeze both units
+					return  # freeze_unit will emit movement_finished for the mover
 		_execute_next_move(unit_name)
 	)
 
@@ -1272,3 +1372,117 @@ func _hex_dist(ac: int, ar: int, bc: int, br: int) -> float:
 	var bs := br
 	var by := -bq - bs
 	return max(abs(aq - bq), max(abs(ay - by), abs(as_ - bs)))
+
+
+# ── Debug text (queue overlay) ────────────────────────────────────────────────
+
+func set_unit_debug_text(unit_name: String, text: String) -> void:
+	_unit_debug_texts[unit_name] = text
+
+
+# ── Victory city ──────────────────────────────────────────────────────────────
+
+func set_victory_city(col: int, row: int) -> void:
+	_victory_city = Vector2i(col, row)
+	_rebuild_victory_marker()
+
+
+func get_victory_city() -> Vector2i:
+	return _victory_city
+
+
+func _rebuild_victory_marker() -> void:
+	if is_instance_valid(_victory_city_marker):
+		_victory_city_marker.queue_free()
+	_victory_city_marker = null
+	if _victory_city.x < 0 or not _in_bounds(_victory_city.x, _victory_city.y):
+		return
+	var root := Node3D.new()
+	root.name = "VictoryCityMarker"
+	var wpos := hex_to_world(_victory_city.x, _victory_city.y)
+	root.position = Vector3(wpos.x, 1.1, wpos.z)
+	# Golden glowing ring
+	var ring_mesh := MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius    = 0.82
+	cyl.bottom_radius = 0.82
+	cyl.height        = 0.06
+	cyl.radial_segments = 6
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color      = Color(1.0, 0.85, 0.1, 0.5)
+	mat.emission_enabled  = true
+	mat.emission          = Color(1.0, 0.7, 0.0) * 1.2
+	mat.transparency      = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.no_depth_test     = true
+	ring_mesh.mesh              = cyl
+	ring_mesh.material_override = mat
+	root.add_child(ring_mesh)
+	# Star label
+	var lbl := Label3D.new()
+	lbl.text          = "★胜利目标"
+	lbl.font_size     = 56
+	lbl.pixel_size    = 0.006
+	lbl.modulate      = Color(1.0, 0.9, 0.1, 1.0)
+	lbl.billboard     = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.no_depth_test = true
+	lbl.position      = Vector3(0.0, 0.7, 0.0)
+	root.add_child(lbl)
+	add_child(root)
+	_victory_city_marker = root
+
+
+# ── Supply convoy markers ─────────────────────────────────────────────────────
+
+func add_convoy_marker(convoy_id: String, col: int, row: int, color: Color) -> void:
+	if _convoy_markers.has(convoy_id):
+		return
+	if not is_instance_valid(_generated_root):
+		return
+	var root := Node3D.new()
+	root.name = "Convoy_" + convoy_id
+	root.position = hex_to_world(col, row)
+	var box_mesh := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.22, 0.22, 0.22)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color     = color
+	mat.emission_enabled = true
+	mat.emission         = color * 0.6
+	box_mesh.mesh              = box
+	box_mesh.material_override = mat
+	box_mesh.position          = Vector3(0.0, 1.38, 0.0)
+	root.add_child(box_mesh)
+	_generated_root.add_child(root)
+	_convoy_markers[convoy_id] = root
+
+
+func update_convoy_marker(convoy_id: String, col: int, row: int) -> void:
+	var root: Node3D = _convoy_markers.get(convoy_id) as Node3D
+	if not is_instance_valid(root):
+		return
+	var tween := create_tween()
+	tween.tween_property(root, "position", hex_to_world(col, row), 1.0)
+
+
+func remove_convoy_marker(convoy_id: String) -> void:
+	var root: Node3D = _convoy_markers.get(convoy_id) as Node3D
+	if is_instance_valid(root):
+		root.queue_free()
+	_convoy_markers.erase(convoy_id)
+
+
+# ── Passable column helper (for supply convoy spawning) ───────────────────────
+
+func find_random_passable_in_col(col: int) -> int:
+	var passable: Array = []
+	for r in range(_grid_rows):
+		if _in_bounds(col, r) and not _is_impassable(_terrain[r][col]):
+			passable.append(r)
+	if passable.is_empty():
+		# Fallback: any passable row anywhere
+		for r in range(_grid_rows):
+			for c in range(_grid_cols):
+				if not _is_impassable(_terrain[r][c]):
+					return r
+		return 0
+	return passable[randi() % passable.size()]

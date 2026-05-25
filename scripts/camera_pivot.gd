@@ -26,13 +26,6 @@ func _process(delta: float) -> void:
 	if Input.is_action_pressed("ui_up"):    input_dir.z -= 1
 	if Input.is_action_pressed("ui_down"):  input_dir.z += 1
 
-	if Input.is_action_just_pressed("zoom_in"):
-		_zoom = clampf(_zoom - zoom_speed, min_zoom, max_zoom)
-		_apply_zoom()
-	elif Input.is_action_just_pressed("zoom_out"):
-		_zoom = clampf(_zoom + zoom_speed, min_zoom, max_zoom)
-		_apply_zoom()
-
 	input_dir = input_dir.normalized()
 	position += input_dir * move_speed * real_delta
 
@@ -40,6 +33,17 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
+		if mb.pressed:
+			if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+				_zoom = clampf(_zoom - zoom_speed, min_zoom, max_zoom)
+				_apply_zoom()
+				get_viewport().set_input_as_handled()
+				return
+			elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				_zoom = clampf(_zoom + zoom_speed, min_zoom, max_zoom)
+				_apply_zoom()
+				get_viewport().set_input_as_handled()
+				return
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			_is_dragging = mb.pressed
 			get_viewport().set_input_as_handled()
