@@ -634,7 +634,7 @@ func _create_unit_marker_node(unit_name: String, col: int, row: int, color: Colo
 	if root == null:
 		push_warning("HexMap: failed to instantiate UnitMarker scene.")
 		return {}
-	root.position = hex_to_world(col, row)
+	root.position = _unit_world_pos(col, row)
 	_generated_root.add_child(root)
 	root.configure(unit_name, color, is_enemy)
 	return {
@@ -658,7 +658,13 @@ func _update_marker_pos_for(unit_name: String) -> void:
 	var mr: Node3D = d.get("marker_root")
 	if not is_instance_valid(mr):
 		return
-	mr.position = hex_to_world(int(d["col"]), int(d["row"]))
+	mr.position = _unit_world_pos(int(d["col"]), int(d["row"]))
+
+
+func _unit_world_pos(col: int, row: int) -> Vector3:
+	var pos := hex_to_world(col, row)
+	pos.y += 0.9
+	return pos
 
 
 func update_unit_org(unit_name: String, org: float) -> void:
@@ -1105,7 +1111,7 @@ func _execute_next_move(unit_name: String) -> void:
 		to_tile.on_unit_enter(u)
 
 	var travel_time := _travel_time_for(unit_name, col, row, nc, nr)
-	var target_pos  := hex_to_world(nc, nr)
+	var target_pos  := _unit_world_pos(nc, nr)
 
 	var marker_root: Node3D = d["marker_root"]
 	var tween := create_tween()

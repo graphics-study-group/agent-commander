@@ -48,6 +48,10 @@ func _apply_faction_color() -> void:
 		if child is GeometryInstance3D:
 			var instance_child := child as GeometryInstance3D
 			var mat := _get_or_create_material(instance_child)
+			# Ensure faction tint participates in scene lighting.
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+			mat.emission_enabled = false
+			mat.emission = Color.BLACK
 			mat.albedo_color = faction_color
 			instance_child.material_override = mat
 
@@ -80,10 +84,15 @@ func _get_or_create_material(instance_node: GeometryInstance3D) -> StandardMater
 	var key := instance_node.get_instance_id()
 	if _material_cache.has(key):
 		return _material_cache[key] as StandardMaterial3D
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.emission_enabled = false
-	mat.metallic = 0.0
-	mat.roughness = 1.0
+	var mat: StandardMaterial3D = null
+	if instance_node is MeshInstance3D:
+		var mesh_node := instance_node as MeshInstance3D
+		var src_mat: Material = mesh_node.get_active_material(0)
+		if src_mat is StandardMaterial3D:
+			mat = (src_mat as StandardMaterial3D).duplicate(true)
+	if mat == null:
+		mat = StandardMaterial3D.new()
+		mat.metallic = 0.0
+		mat.roughness = 1.0
 	_material_cache[key] = mat
 	return mat
