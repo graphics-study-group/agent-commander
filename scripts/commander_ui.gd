@@ -972,12 +972,41 @@ func _start_battle(attacker_name: String, defender_name: String) -> void:
 	if hex_map != null and hex_map.has_method("get_unit_pos"):
 		battle_pos = hex_map.get_unit_pos(attacker_name)
 
+	# Collect ALL idle units at this hex on each side
+	var atk_units: Array = [atk_unit]
+	var atk_names: Array = [attacker_name]
+	var def_units: Array = [def_unit]
+	var def_names: Array = [defender_name]
+
+	if hex_map != null and hex_map.has_method("get_unit_pos"):
+		var all_entries: Array = _units_list + _enemy_entries
+		for entry: Dictionary in all_entries:
+			var u: Unit = entry.get("unit") as Unit
+			if u == null:
+				continue
+			var uname: String = u.unit_name
+			if uname == attacker_name or uname == defender_name:
+				continue
+			if not _get_battle_id_for_unit(uname).is_empty():
+				continue  # already in another battle
+			if hex_map.has_method("is_unit_frozen") and hex_map.is_unit_frozen(uname):
+				continue  # busy
+			var upos: Vector2i = hex_map.get_unit_pos(uname)
+			if upos != battle_pos:
+				continue
+			if _is_player_unit(uname) == atk_is_player:
+				atk_units.append(u)
+				atk_names.append(uname)
+			else:
+				def_units.append(u)
+				def_names.append(uname)
+
 	var bid := "battle_%s_vs_%s" % [attacker_name, defender_name]
 
 	var ba: Node = BattleAgentScript.new()
 	add_child(ba)
 	ba.battle_id = bid
-	ba.setup([atk_unit], [def_unit], atk_is_player, def_is_player,
+	ba.setup(atk_units, def_units, atk_is_player, def_is_player,
 		battle_pos.x, battle_pos.y, hex_map, _load_rules())
 
 	ba.combat_report.connect(_on_combat_report)
@@ -986,46 +1015,53 @@ func _start_battle(attacker_name: String, defender_name: String) -> void:
 	ba.debug_log.connect(func(msg: String): _append("[color=gray]%s[/color]" % msg))
 
 	_active_battles[bid] = {
-		"agent":            ba,
-		"attacker_units":   [attacker_name],
-		"defender_units":   [defender_name],
+		"agent":              ba,
+		"attacker_units":     atk_names,
+		"defender_units":     def_names,
 		"attacker_is_player": atk_is_player,
-		"col":              battle_pos.x,
-		"row":              battle_pos.y
+		"col":                battle_pos.x,
+		"row":                battle_pos.y
 	}
 
-	# Freeze both units on the map
+	# Freeze all participants
 	if hex_map != null and hex_map.has_method("freeze_unit"):
-		hex_map.freeze_unit(attacker_name)
-		hex_map.freeze_unit(defender_name)
+		for uname: String in atk_names:
+			hex_map.freeze_unit(uname)
+		for uname: String in def_names:
+			hex_map.freeze_unit(uname)
 	_refresh_battle_combat_orbit(bid)
 
-	# Notify unit agents
-	var atk_agent := _find_any_agent(attacker_name)
-	var def_agent := _find_any_agent(defender_name)
-	if atk_agent != null and atk_agent.has_method("enter_battle"):
-		atk_agent.enter_battle(bid)
-	if def_agent != null and def_agent.has_method("enter_battle"):
-		def_agent.enter_battle(bid)
+	# Notify all unit agents
+	for uname: String in atk_names:
+		var ag := _find_any_agent(uname)
+		if ag != null and ag.has_method("enter_battle"):
+			ag.enter_battle(bid)
+	for uname: String in def_names:
+		var ag := _find_any_agent(uname)
+		if ag != null and ag.has_method("enter_battle"):
+			ag.enter_battle(bid)
 
-	# Notify enemy agent if one side is enemy
-	if _enemy_agent != null:
-		if not atk_is_player or not def_is_player:
-			var enemy_unit_name := defender_name if atk_is_player else attacker_name
-			_enemy_agent.receive_event("combat_start", {
-				"battle_id":    bid,
-				"enemy_unit":   enemy_unit_name,
-				"opponent":     attacker_name if not atk_is_player else defender_name,
-				"message":      "你的部队 %s 与敌方部队 %s 进入战斗，你可以通过 send_combat_order 发送战术指令。" % [
-					enemy_unit_name,
-					attacker_name if not atk_is_player else defender_name
-				]
-			})
+	# Notify enemy agent
+	if _enemy_agent != null and (not atk_is_player or not def_is_player):
+		var enemy_names := def_names if atk_is_player else atk_names
+		var player_names := atk_names if atk_is_player else def_names
+		var enemy_str := ", ".join(enemy_names)
+		var player_str := ", ".join(player_names)
+		_enemy_agent.receive_event("combat_start", {
+			"battle_id": bid,
+			"enemy_unit": enemy_str,
+			"opponent":   player_str,
+			"message":    "你的部队 %s 与敌方部队 %s 进入战斗，你可以通过 send_combat_order 发送战术指令。" % [
+				enemy_str, player_str
+			]
+		})
 
 	var side_a := "蓝方" if atk_is_player else "红方"
 	var side_b := "蓝方" if def_is_player else "红方"
+	var atk_desc := ", ".join(atk_names)
+	var def_desc := ", ".join(def_names)
 	_append("\n[color=orange][⚔ 战斗开始][/color] %s（%s）vs %s（%s）" % [
-		attacker_name, side_a, defender_name, side_b
+		atk_desc, side_a, def_desc, side_b
 	])
 	ba.start()
 
