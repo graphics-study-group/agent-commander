@@ -19,6 +19,7 @@ var _is_processing: bool = false
 var _exec_running: bool = false
 var _next_event_id: int = 0
 var _next_queue_id: int = 0
+var _has_split: bool = false
 var debug_mode: bool = false: set = _set_debug_mode
 var _in_battle: bool = false
 
@@ -33,23 +34,8 @@ const TOOLS: Array = [
 	{
 		"type": "function",
 		"function": {
-			"name": "calculate_path",
-			"description": "立即计算当前位置到目标格的最短路径（避开山/水）。在 enqueue_action(move) 前必须先调用。",
-			"parameters": {
-				"type": "object",
-				"properties": {
-					"to_col": {"type": "integer", "description": "目标列 (0-15)"},
-					"to_row": {"type": "integer", "description": "目标行 (0-15)"}
-				},
-				"required": ["to_col", "to_row"]
-			}
-		}
-	},
-	{
-		"type": "function",
-		"function": {
 			"name": "enqueue_action",
-			"description": "将动作加入执行队列按序执行，或对 modify_stats 立即执行（immediate=true）。\ntype 及对应 params 格式：\n· move         {col:X, row:Y}          移动一格（原子操作）；先用 calculate_path 得到完整路径，再对每一步分别调用一次本工具入队\n· wait         {seconds:N}             等待N秒\n· modify_stats {changes:{STAT:delta,...}, reason:\"原因\", delay_seconds:N, duration:N}  修改属性；delay_seconds=延迟N秒生效（默认0）；duration=-1永久，duration>0则N秒后自动还原（严禁归零）\n· emit_event   {event_type:\"类型\", event_info:{}}  完成后向自身发送事件（可实现周期任务）\nimmediate 仅对 modify_stats 有效：true=绕过队列立即生效（适用于急行军、临阵强化等即时效果）。\nretain 对 move/wait/emit_event 有效；modify_stats 的保留状态由 duration 自动决定。",
+			"description": "将动作加入执行队列按序执行，或对 modify_stats 立即执行（immediate=true）。\ntype 及对应 params 格式：\n· move_to      {col:X, row:Y}          移动到目标格（游戏自动寻路，逐格执行，可在步间被取消或战斗打断）\n· wait         {seconds:N}             等待N秒\n· modify_stats {changes:{STAT:delta,...}, reason:\"原因\", delay_seconds:N, duration:N}  修改属性；delay_seconds=延迟N秒生效（默认0）；duration=-1永久，duration>0则N秒后自动还原（严禁归零）\n· emit_event   {event_type:\"类型\", event_info:{}}  完成后向自身发送事件（可实现周期任务）\nimmediate 仅对 modify_stats 有效：true=绕过队列立即生效（适用于急行军、临阵强化等即时效果）。\nretain 对 move_to/wait/emit_event 有效；modify_stats 的保留状态由 duration 自动决定。",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -314,6 +300,9 @@ func delete_queue_external(target_id: int) -> Dictionary:
 	for item: Dictionary in _exec_queue:
 		if int(item.get("id", -1)) == target_id:
 			if item.get("status") == "running":
+				if item.get("type") == "move_to":
+					item["status"] = "cancelled"
+					return {"cancelled_id": target_id}
 				return {"error": "正在执行（原子性保护），无法取消"}
 			if item.get("status") == "completed":
 				return {"skipped": true, "reason": "已完成"}
@@ -325,7 +314,10 @@ func delete_queue_external(target_id: int) -> Dictionary:
 
 func clear_queue_external() -> Dictionary:
 	for item: Dictionary in _exec_queue:
-		if item.get("status") == "pending":
+		var st: String = item.get("status", "")
+		if st == "pending":
+			item["status"] = "cancelled"
+		elif st == "running" and item.get("type") == "move_to":
 			item["status"] = "cancelled"
 	_notify_route_changed()
 	return {"cleared": true}
@@ -499,6 +491,9 @@ func _execute_tool(fn_name: String, args: Dictionary) -> Dictionary:
 			for item: Dictionary in _exec_queue:
 				if int(item.get("id", -1)) == target_id:
 					if item.get("status") == "running":
+						if item.get("type") == "move_to":
+							item["status"] = "cancelled"
+							return {"cancelled_id": target_id}
 						return {"error": "正在执行（原子性保护），无法取消"}
 					if item.get("status") == "completed":
 						return {"skipped": true, "reason": "已完成，无需取消"}
@@ -509,7 +504,10 @@ func _execute_tool(fn_name: String, args: Dictionary) -> Dictionary:
 
 		"clear_exec_queue":
 			for item: Dictionary in _exec_queue:
-				if item.get("status") == "pending":
+				var st: String = item.get("status", "")
+				if st == "pending":
+					item["status"] = "cancelled"
+				elif st == "running" and item.get("type") == "move_to":
 					item["status"] = "cancelled"
 			_notify_route_changed()
 			return {"cleared": true}
@@ -566,6 +564,8 @@ func _execute_tool(fn_name: String, args: Dictionary) -> Dictionary:
 			return {"ok": true, "old_name": old_name, "new_name": new_name}
 
 		"split_unit":
+			if _has_split:
+				return {"error": "此部队已执行过拆分，不可重复拆分"}
 			var frags: Array = args.get("fragments", [])
 			if frags.size() < 2:
 				return {"error": "至少需要拆分为2个子部队"}
@@ -574,6 +574,7 @@ func _execute_tool(fn_name: String, args: Dictionary) -> Dictionary:
 			if ui2 == null:
 				return {"error": "UI不可用"}
 			var history := get_api_history()
+			_has_split = true
 			return ui2.do_split(unit, self, frags, history)
 
 	return {"error": "未知工具: " + fn_name}
@@ -630,6 +631,32 @@ func _execute_item(item: Dictionary) -> void:
 				var emitted_name: String = await _hex_map.movement_finished
 				if emitted_name == unit.unit_name:
 					break
+
+		"move_to":
+			if _hex_map == null or not _hex_map.has_method("set_move_path") or unit == null:
+				return
+			if _hex_map.has_method("is_unit_frozen") and _hex_map.is_unit_frozen(unit.unit_name):
+				return
+			var tc := int(p.get("col", 0))
+			var tr := int(p.get("row", 0))
+			var pos := _get_unit_pos()
+			var path: Array = _hex_map.calc_path(pos.x, pos.y, tc, tr)
+			if path.is_empty():
+				return
+			var start_idx := 0
+			if int(path[0][0]) == pos.x and int(path[0][1]) == pos.y:
+				start_idx = 1
+			for i in range(start_idx, path.size()):
+				if item.get("status") == "cancelled":
+					return
+				if _hex_map.has_method("is_unit_frozen") and _hex_map.is_unit_frozen(unit.unit_name):
+					return
+				var step = path[i]
+				_hex_map.set_move_path(unit.unit_name, [[int(step[0]), int(step[1])]])
+				while true:
+					var emitted_name: String = await _hex_map.movement_finished
+					if emitted_name == unit.unit_name:
+						break
 
 		"wait":
 			var total := float(p.get("seconds", 1.0))
@@ -717,7 +744,17 @@ func _build_system_prompt() -> String:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 func get_api_history() -> Array:
-	return _api.get_history() if _api != null else []
+	if _api == null:
+		return []
+	var h: Array = _api.get_history()
+	# Strip any trailing assistant message with unresolved tool_calls — injecting it
+	# into a new agent would violate the API rule that tool_calls must be followed
+	# immediately by tool result messages.
+	if not h.is_empty():
+		var last = h[-1]
+		if last is Dictionary and last.get("role") == "assistant" and last.has("tool_calls"):
+			h = h.slice(0, h.size() - 1)
+	return h
 
 
 func inject_history(history: Array) -> void:

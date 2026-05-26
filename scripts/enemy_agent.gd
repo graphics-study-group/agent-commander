@@ -6,7 +6,7 @@ signal debug_log(msg: String)
 
 const DeepSeekAPI = preload("res://scripts/deepseek_api.gd")
 const TOKEN_WARN_CHARS := 3_000_000
-const IDLE_REASSESS_INTERVAL := 30.0  # real wall-clock seconds
+const IDLE_REASSESS_INTERVAL := 30.0  # game-time seconds (respects Engine.time_scale)
 
 var _api: Node
 var _hex_map: Node
@@ -15,7 +15,7 @@ var _player_entries: Array = []  # [{unit, agent, ...}] read-only context
 var _enemy_entries: Array = []   # [{unit, agent}] we command these
 
 var _is_processing: bool = false
-var _last_reassess_time: float = 0.0
+var _idle_elapsed: float = 0.0
 var _inbox: Array = []
 var _next_event_id: int = 0
 var debug_mode: bool = false: set = _set_debug_mode
@@ -26,24 +26,8 @@ const TOOLS: Array = [
 	{
 		"type": "function",
 		"function": {
-			"name": "calculate_path",
-			"description": "计算指定我方部队从当前位置到目标格的最短路径（避开山/水）。在 enqueue_action(move) 前必须先调用。",
-			"parameters": {
-				"type": "object",
-				"properties": {
-					"unit_name": {"type": "string", "description": "我方部队名称"},
-					"to_col":    {"type": "integer", "description": "目标列 (0-15)"},
-					"to_row":    {"type": "integer", "description": "目标行 (0-15)"}
-				},
-				"required": ["unit_name", "to_col", "to_row"]
-			}
-		}
-	},
-	{
-		"type": "function",
-		"function": {
 			"name": "enqueue_action",
-			"description": "将动作加入指定我方部队的执行队列，或对 modify_stats 立即执行（immediate=true）。\ntype 格式：\n· move         {col:X, row:Y}          移动一格（原子操作）；先 calculate_path 得到路径，再对每一步分别调用一次本工具入队\n· wait         {seconds:N}\n· modify_stats {changes:{STAT:delta,...}, reason:\"原因\", delay_seconds:N, duration:N}  delay_seconds=延迟N秒生效；duration=-1永久，duration>0自动还原（严禁归零）\n· emit_event   {event_type:\"类型\", event_info:{}}\nimmediate 仅对 modify_stats 有效：true=绕过队列立即生效（适用于急行军等即时效果）。\nretain 对 move/wait/emit_event 有效；modify_stats 由 duration 自动决定。",
+			"description": "将动作加入指定我方部队的执行队列，或对 modify_stats 立即执行（immediate=true）。\ntype 格式：\n· move_to      {col:X, row:Y}          移动到目标格（游戏自动寻路，逐格执行，可在步间被取消或战斗打断）\n· wait         {seconds:N}\n· modify_stats {changes:{STAT:delta,...}, reason:\"原因\", delay_seconds:N, duration:N}  delay_seconds=延迟N秒生效；duration=-1永久，duration>0自动还原（严禁归零）\n· emit_event   {event_type:\"类型\", event_info:{}}\nimmediate 仅对 modify_stats 有效：true=绕过队列立即生效（适用于急行军等即时效果）。\nretain 对 move_to/wait/emit_event 有效；modify_stats 由 duration 自动决定。",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -145,7 +129,7 @@ func setup(player_entries: Array, enemy_entries: Array,
 	_api.request_failed.connect(_on_error)
 
 	set_process(true)
-	_last_reassess_time = Time.get_unix_time_from_system()
+	_idle_elapsed = 0.0
 
 
 func reload_rules(rules: String) -> void:
@@ -156,7 +140,7 @@ func reload_rules(rules: String) -> void:
 # ── Public event API ──────────────────────────────────────────────────────────
 
 func receive_event(event_type: String, event_info: Dictionary) -> void:
-	_last_reassess_time = Time.get_unix_time_from_system()
+	_idle_elapsed = 0.0
 	var event := {
 		"id":        _next_event_id,
 		"type":      event_type,
@@ -171,12 +155,12 @@ func receive_event(event_type: String, event_info: Dictionary) -> void:
 
 # ── Idle reassess timer ───────────────────────────────────────────────────────
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _is_processing or _api == null:
 		return
-	var now := Time.get_unix_time_from_system()
-	if now - _last_reassess_time >= IDLE_REASSESS_INTERVAL:
-		_last_reassess_time = now
+	_idle_elapsed += delta
+	if _idle_elapsed >= IDLE_REASSESS_INTERVAL:
+		_idle_elapsed = 0.0
 		receive_event("idle_reassess", {"trigger": "30秒无新事件，自动重新评估战场态势"})
 
 
@@ -240,8 +224,9 @@ func _build_all_units_context() -> String:
 			if not queue.is_empty():
 				var q_strs: Array[String] = []
 				for item: Dictionary in queue:
-					q_strs.append("#%d[%s]%s" % [
-						item.get("id", 0), item.get("status", ""), item.get("type", "")])
+					q_strs.append("#%d[%s]%s %s" % [
+						item.get("id", 0), item.get("status", ""), item.get("type", ""),
+						JSON.stringify(item.get("params", {}))])
 				lines.append("    队列: " + ", ".join(q_strs))
 
 	return "\n".join(lines)
@@ -271,24 +256,6 @@ func _on_tool_calls(calls: Array) -> void:
 
 func _execute_tool(fn_name: String, args: Dictionary) -> Dictionary:
 	match fn_name:
-		"calculate_path":
-			var unit_name: String = args.get("unit_name", "")
-			var agent := _find_enemy_agent(unit_name)
-			if agent == null:
-				return {"error": "未找到我方部队: " + unit_name}
-			if _hex_map == null:
-				return {"error": "地图不可用"}
-			var pos: Vector2i = _hex_map.get_unit_pos(unit_name)
-			var tc := int(args.get("to_col", 0))
-			var tr := int(args.get("to_row", 0))
-			var path: Array = _hex_map.calc_path(pos.x, pos.y, tc, tr)
-			if path.is_empty():
-				return {"reachable": false, "message": "目标不可达或已在当前位置"}
-			var out: Array = []
-			for step in path:
-				out.append({"col": step[0], "row": step[1]})
-			return {"reachable": true, "path": out, "steps": out.size()}
-
 		"enqueue_action":
 			var unit_name: String = args.get("unit_name", "")
 			var agent := _find_enemy_agent(unit_name)

@@ -1,0 +1,151 @@
+w14:paraId="51E51F36" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">军队战斗与支援结算规则 (完整版)
+w14:paraId="5DEB4C95" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">________________________________________
+w14:paraId="26E5D489" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">一、 基础单位：军队
+w14:paraId="5A174E88" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">一支军队是一个独立的作战单位，拥有以下基础属性。
+w14:paraId="4B2C8B2D" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">属性变量名说明
+w14:paraId="06E41A0A" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">攻击力ATK反人员/反装甲的综合火力值。
+w14:paraId="77C79931" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">防御力DEF躲避伤害的综合防御值（地形、装甲等）。
+w14:paraId="3F4CE968" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">组织度ORG“生命值”，部队维持编制和战斗的能力。受熟练度影响上限。
+w14:paraId="04A31752" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">士气MORALE部队的战斗意志，影响攻击效率和崩溃临界点。
+w14:paraId="7FC264C6" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">熟练度PROF部队的训练水平。是组织度恢复、执行复杂命令的基础。
+w14:paraId="5FA104C7" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">侦察力RECON决定先手、发现敌军和情报优势。
+w14:paraId="3F412215" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">兵力STR编制完整度，100% = 满编。是生命值和伤害输出的基础乘数。
+w14:paraId="40C546A9" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">补给值SUPPLY当前补给水平，是士气和组织度恢复的硬上限。上限7，每日-1。
+w14:paraId="6B34A2B9" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">移动速度SPEED决定地图机动性和战场内战术调整。
+w14:paraId="5D539189" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">参谋能力STAFF影响军团将各旅、营的攻击进行协同的“协作系数”。
+w14:paraId="6A031832" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">________________________________________
+w14:paraId="13C437CB" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">二、 战前数值准备
+w14:paraId="699D235C" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">1. 基础战斗面板
+w14:paraId="4C627E9A" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">一支军队的当前战斗面板由其基础属性直接决定：
+w14:paraId="799FAF49" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">攻击力 = ATK
+w14:paraId="7E147F73" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">防御力 = DEF
+w14:paraId="736A4966" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">组织度 = ORG
+w14:paraId="4F8EBA2D" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">士气 = MORALE
+w14:paraId="31892E62" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">兵力 = STR
+w14:paraId="76C53DDD" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">补给值 = SUPPLY
+w14:paraId="07E34671" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">侦察力 = RECON + STAFF
+w14:paraId="351219F8" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">先手值 = RECON + STAFF + SPEED
+w14:paraId="127B0C6C" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">2. 修正因子计算
+w14:paraId="15985019" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">将所有外部因素转换为百分比乘数，最终作用于攻击和防御强度。
+w14:paraId="0F457FCA" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">A. 进攻方突击强度
+w14:paraId="78441E67" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">突击强度 = 攻击力 × ∏(进攻方Buff)
+w14:paraId="684F5432" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">Buff/Debuff效果
+w14:paraId="465DE8E4" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">侧翼加成若从多个角度进攻，攻击力 +20%
+w14:paraId="1BBC4DCB" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">统帅影响在统帅的指挥影响范围内，攻击力 +15%
+w14:paraId="22012BDB" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">侦察优势若己方侦察力 &gt; 敌方，多出部分每10%增加2%攻击力
+w14:paraId="21FC327F" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">补给不足若SUPPLY &lt; 0%，补给值每-1，攻击力 -15%
+w14:paraId="632A05FB" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">B. 防御方防御强度
+w14:paraId="5E3451D6" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">防御强度 = 防御力 × ∏(防御方Buff) × ∏(地形工事乘数)
+w14:paraId="18346EEA" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">Buff/Debuff效果
+w14:paraId="2E8FB743" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">地形-山地/森林/雨天防御力 × 2.0
+w14:paraId="5A765E47" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">地形-村镇/建筑防御力 × 2.5
+w14:paraId="0A0BBAF0" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">防守状态防御力 × 1.25
+w14:paraId="7F0F474D" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">营垒状态防御力 × 2.0
+w14:paraId="082F4512" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">侧翼暴露被多方夹击，防御力 -20%
+w14:paraId="18796CD4" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">士气低落若军团士气低于30%，防御力 -25%
+w14:paraId="0550B7B8" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">________________________________________
+w14:paraId="04A4B1E3" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">三、 实时战斗流程
+w14:paraId="3D49131A" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">1. 接触与先手
+w14:paraId="376EAAC8" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">两支军队进入彼此侦察范围即发生接触。
+w14:paraId="2B9A886F" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">先手判定: 比较双方先手值 = RECON + STAFF + SPEED。
+w14:paraId="6270D2A1" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">优势方: 获得15秒的“战术压制”状态，此期间攻击力+10%，敌方防御力-10%，模拟突袭或展开优势。
+w14:paraId="1D4D4F32" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">地形影响: 防守方若处于防御地形（城市、山地、营垒），可无视敌方先手，直接获得“阵地坚守”状态。
+w14:paraId="39E3E970" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">2. 持续交火模型
+w14:paraId="777F30F8" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">交火是连续的，每秒进行一次小规模结算。
+w14:paraId="65869EA4" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">伤害计算公式:
+w14:paraId="7880DFDA" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">DPS = 攻击方突击强度 × 攻击方兵力百分比 × 攻击方士气系数
+w14:paraId="0318AC14" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">实际承受伤害 = DPS / 防御方防御强度 × 随机因子(0.85 ~ 1.15)
+w14:paraId="648E34BC" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">(士气系数 = 当前士气 / 100)
+w14:paraId="3E89F65A" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">伤害分配:
+w14:paraId="4DBCB44F" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">优先打击组织度: 承受的伤害80%先由组织度吸收。这代表队形被打乱、通讯中断、协同失效。
+w14:paraId="5B5E1DD4" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">溢出打击兵力: 当组织度归零，后续伤害100%作用于兵力，造成永久性人员伤亡和装备损失。
+w14:paraId="44AB33C5" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">士气联动: 每当兵力损失1%，军团士气-1。每当组织度损失10%（从满额算），士气-2。这是实时压垮部队心理的核心。
+w14:paraId="76EDD9AA" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">3. 状态评估与自主反应
+w14:paraId="1DC44B71" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">这是实时战斗的灵魂。军队每5秒进行一次状态评估，决定后续行为。
+w14:paraId="0E8EEB1F" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">当前素质 = 熟练度 × 0.5 + 士气 × 0.5 - (组织度损失% × 0.5)
+w14:paraId="1BDEB92A" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">4. 坚守、撤退与崩溃
+w14:paraId="4A723CE0" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">部队的行为由两个核心阈值控制：“有序撤退线”和“崩溃线”。
+w14:paraId="1B963532" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">A. 坚守/死守逻辑
+w14:paraId="6C836E24" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">只要当前组织度 &gt; 0，且士气 &gt; 25，部队会执行默认指令。
+w14:paraId="09255703" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">若指令为“死守”，它会尝试战斗到最后一人。
+w14:paraId="7887D259" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">死守状态增益: 组织度下降速度-30%，但每损失10%兵力，士气额外-3。同时，它永远不会触发“有序撤退”，只会进入“崩溃”。
+w14:paraId="0D9D8C62" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">B. 有序撤退（战术撤退）
+w14:paraId="701F3C61" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">触发条件（必须同时满足）:
+w14:paraId="795C3897" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">组织度 &lt; 40%（代表编制已混乱）。
+w14:paraId="61F3F3A9" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">士气 &gt; 20%（部队还有理智和纪律）。
+w14:paraId="66D78F81" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">参谋能力检定成功: Random(0, 100) &lt; 参谋能力 + 统帅影响。
+w14:paraId="76A94464" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">撤退能力: 判定成功后，部队不会立刻溃散。它会进入“且战且退”状态，持续15秒。
+w14:paraId="56B1AC2F" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">状态效果: 移动速度-50%，防御力+20%（保持后方和侧翼防护），攻击力-40%。
+w14:paraId="79276AA7" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">结果: 若15秒内未遭受毁灭性打击，部队成功脱战，转为“败退重整”状态，向己方战线后方移动。这是“有能力撤退”的标志。
+w14:paraId="783371DD" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">失败惩罚: 若参谋能力检定失败，或撤退过程中组织度归零，则立即转入“崩溃”。
+w14:paraId="68A42C62" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">C. 崩溃（溃散）
+w14:paraId="7D47AA9A" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">触发条件（满足其一即可）:
+w14:paraId="4168D194" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">士气 ≤ 20%（恐惧压倒了纪律）。
+w14:paraId="6D3CE983" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">组织度归零超过15秒（部队已彻底无法组织有效抵抗）。
+w14:paraId="54D7431F" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">短时间内承受巨大伤亡: 在10秒内，兵力损失 &gt; 25%。
+w14:paraId="6136D1E7" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">崩溃表现:
+w14:paraId="0F1F7C5D" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">部队立刻放弃所有抵抗，防御力降至0，攻击力降至0。
+w14:paraId="45F2AF69" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">所有单位以最快速度向随机后方方向散开，不受玩家控制。
+w14:paraId="0A402EC2" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">传染效果: 会传染周围友军，挨着的友军士气-7。当溃兵接触后方部队时，后方部队士气-7。
+w14:paraId="5B4E7342" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">________________________________________
+w14:paraId="6BA8A050" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">四、 战后结算
+w14:paraId="3F1B0823" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">战斗结束后，参与者状态发生永久或半永久改变。
+w14:paraId="0B13EFEC" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">A. 兵力损失
+w14:paraId="16E7F5F9" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">实时伤亡: 战斗中累计的兵力损失。
+w14:paraId="5BD3FEA3" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">战后逃兵:
+w14:paraId="6EDCA15B" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">有序撤退方: 兵力额外损失 2%。
+w14:paraId="212720B6" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">崩溃方: 兵力额外损失 10% + 参谋能力 × 0.1。
+w14:paraId="751EBB4F" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">伤员处理:
+w14:paraId="3704B3B2" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">总兵力损失的30%会成为“伤员”。
+w14:paraId="4A6E8004" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">若有序撤离，伤员可逐渐恢复。
+w14:paraId="0C31F6D1" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">若部队崩溃，伤员视作全员被俘，敌方获得其一部分人力。
+w14:paraId="73D66FD6" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">直接损失: 战斗中的兵力消耗，永久死亡。
+w14:paraId="048D62A0" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">溃败额外逃兵: 若撤退或崩溃时士气 &lt; 20%，额外损失5%~15%的兵力。
+w14:paraId="3F0D4D98" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">B. 组织度
+w14:paraId="7C66A645" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">未撤退或有序撤退: 以 5% + 熟练度 × 0.1 /秒 的速度快速恢复，直到恢复至80%。模拟部队脱离接触后重组编制。
+w14:paraId="09058E0B" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">崩溃: 获得“混乱”Debuff，组织度恢复速度变为 1% /秒，持续60秒，且无法接受任何命令。
+w14:paraId="352701E8" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">C. 士气
+w14:paraId="3480E6D1" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">胜利或坚守成功: 立即 +15。
+w14:paraId="5023A8FB" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">有序撤退: -10。
+w14:paraId="031682D9" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">崩溃: -25。崩溃的部队会在30秒内持续恢复士气，但上限被限制在40%，直到回到安全区域休整。
+w14:paraId="11A67442" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">僵持/未分胜负: 士气 -5。
+w14:paraId="39C6CF03" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">D. 熟练度动态变化
+w14:paraId="1B007810" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">参与战斗: 所有参与部队熟练度 +1。
+w14:paraId="7C0ACCB5" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">战斗胜利: 熟练度 +3。
+w14:paraId="455C4639" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">歼灭战 (突击强度比 &gt; 5): 熟练度 +5。
+w14:paraId="7FFEC5F4" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">参谋经验: 参谋能力高的部队，能从战斗中获取额外经验（参谋能力+1）。
+w14:paraId="6BFD2C41" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">E. 补给消耗与夺取
+w14:paraId="6A97BB50" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">补给消耗: 每日消耗1点。
+w14:paraId="59F9D616" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">补给夺取触发: 当一支军队被判定为“崩溃”的瞬间，或是在“死守”状态下被全歼时。
+w14:paraId="6096E4A7" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">夺取比例: 胜利方立即获得失败方当前补给值的60%。
+w14:paraId="17CED2A2" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">设计意图: 惩罚在不利局面下死扛的玩家，奖励果断发起歼灭战的指挥官，模拟缴获物资的战场现实。
+w14:paraId="74733CE8" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">________________________________________
+w14:paraId="03F488FF" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">五、 支援规则
+w14:paraId="573843BA" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">1. 进场与侦察
+w14:paraId="058003A4" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">进场侦察:
+w14:paraId="1B18573D" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">支援军队到达时，使用自身先手值进行一次侦察对抗。
+w14:paraId="0FD77C88" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">敌方使用当前战场侦察力总和进行对抗。
+w14:paraId="58D117D1" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">奇袭成功: 若支援方先手值 &gt; 敌方侦察力总和，获得15秒“战术压制”状态（攻击+10%，敌方防御-10%），并可使敌方触发“侧翼暴露”（防御-20%）。
+w14:paraId="688B7F6B" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">被发现: 若支援方先手值 ≤ 敌方侦察力总和，正常加入战斗，无特殊加成。敌方可能提前调整阵型，免除侧翼暴露惩罚。
+w14:paraId="4AA42B8C" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">2. 战场合流（属性合并）
+w14:paraId="1727877B" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">支援军队与原军队合并，视为一个新的战斗集团，所有属性按规则重新计算。
+w14:paraId="6285498E" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">属性合并规则
+w14:paraId="2E63BE8E" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">攻击力原攻击力 + 支援攻击力
+w14:paraId="43920BA0" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">防御力原防御力 + 支援防御力
+w14:paraId="54D4E240" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">组织度(原当前组织度 + 支援当前组织度) / 2
+w14:paraId="05F88506" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">士气(原士气 × 原兵力 + 支援士气 × 支援兵力) / (原兵力 + 支援兵力)
+w14:paraId="2A13ED81" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">熟练度(原熟练度 × 原兵力 + 支援熟练度 × 支援兵力) / (原兵力 + 支援兵力)
+w14:paraId="598B3BCA" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">侦察力MAX(原侦察力, 支援侦察力) + 新参谋能力
+w14:paraId="4D818AA0" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">参谋能力(原参谋能力 + 支援参谋能力) / 2
+w14:paraId="7DAFF895" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">移动速度MIN(原移动速度, 支援移动速度)
+w14:paraId="62E071E0" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">补给值MIN(原补给值, 支援补给值) (后勤短板决定全军状态)
+w14:paraId="577D810E" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">3. 状态刷新
+w14:paraId="04CCD865" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">压制与坚守: 原有Buff/Debuff保留。同类型效果（如多个“战术压制”）取最高值，持续时间取最晚结束者，不叠加。
+w14:paraId="41965A28" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">撤退/崩溃终止:
+w14:paraId="400D849A" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">若原军队处于“且战且退”状态，合并后组织度 &gt; 40% 且士气 &gt; 25%，则立即终止撤退，转为坚守。
+w14:paraId="61A4DA24" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">若原军队已“崩溃”，支援无法挽救。崩溃军队仍会后撤，支援军队在进场时士气-7（被溃兵冲击），并需单独面对敌军。
+w14:paraId="0C517AE3" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">4. 战后结算调整
+w14:paraId="2CE407D8" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">各军队的兵力损失、熟练度获取等，根据参与战斗的时长分别记录。
+w14:paraId="430DB7D8" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">中途参战方熟练度: +1(参战)，若胜利再 +1(胜利)，而非全程参战的 +3。若是歼灭战且参战时长超过一半，则可正常获得 +5。
+w14:paraId="0052B32A" w14:textId="77777777" w:rsidR="005F422F" w:rsidRPr="005F422F" w:rsidRDefault="005F422F" w:rsidP="005F422F">补给夺取: 合并部队获胜时，缴获的补给按各军队参战时长或贡献比例分配。
+w14:paraId="049271F9" w14:textId="2AD66040" w:rsidR="005D3D28" w:rsidRPr="005F422F" w:rsidRDefault="005D3D28" w:rsidP="005F422F">
