@@ -20,6 +20,7 @@ const TILE_SCENE_FOREST := preload("res://scenes/tiles/ForestTile.tscn")
 const TILE_SCENE_MOUNTAIN := preload("res://scenes/tiles/MountainTile.tscn")
 const TILE_SCENE_WATER := preload("res://scenes/tiles/WaterTile.tscn")
 const TILE_SCENE_CITY := preload("res://scenes/tiles/CityTile.tscn")
+const UNIT_MARKER_SCENE := preload("res://scenes/units/UnitMarker.tscn")
 
 @export var auto_generate_on_ready := true
 @export_file("*.tres", "*.res") var startup_map_path := ""
@@ -34,9 +35,8 @@ var _spawn_row := 8
 var player_unit_count: int = 2
 var enemy_unit_count: int = 2
 
-# unit_name → {unit, col, row, color, marker_root, cylinder, name_label,
-#              hp_bg, hp_fg, move_queue, current_tween, is_moving,
-#              speed_buff_kmh, speed_buff_hexes}
+# unit_name → {unit, col, row, color, marker_root, move_queue, current_tween,
+#              is_moving, speed_buff_kmh, speed_buff_hexes}
 var _units: Dictionary = {}
 var _frozen_units: Dictionary = {}  # unit_name → true (blocks movement while in battle)
 var _unit_templates: Array = []     # Array[Dictionary] — initial unit configs saved with map
@@ -179,10 +179,6 @@ func register_unit(unit: Unit, color: Color = Color(0.25, 0.55, 1.0),
 		"color": color,
 		"is_enemy": is_enemy,
 		"marker_root": m["marker_root"],
-		"cylinder": m["cylinder"],
-		"name_label": m["name_label"],
-		"hp_bg": m["hp_bg"],
-		"hp_fg": m["hp_fg"],
 		"move_queue": [],
 		"current_tween": null,
 		"is_moving": false,
@@ -631,76 +627,18 @@ func _get_tile_node(col: int, row: int) -> TileBase:
 
 func _create_unit_marker_node(unit_name: String, col: int, row: int, color: Color,
 		is_enemy: bool = false) -> Dictionary:
-	var root := Node3D.new()
-	root.name = "Marker_" + unit_name
+	if UNIT_MARKER_SCENE == null:
+		push_warning("HexMap: UnitMarker scene is missing.")
+		return {}
+	var root := UNIT_MARKER_SCENE.instantiate() as UnitMarker
+	if root == null:
+		push_warning("HexMap: failed to instantiate UnitMarker scene.")
+		return {}
 	root.position = hex_to_world(col, row)
 	_generated_root.add_child(root)
-
-	# Cylinder body
-	var cyl_mesh := MeshInstance3D.new()
-	var cyl := CylinderMesh.new()
-	cyl.top_radius = 0.18
-	cyl.bottom_radius = 0.18
-	cyl.height = 0.45
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.emission_enabled = true
-	mat.emission = color * 0.5
-	cyl_mesh.mesh = cyl
-	cyl_mesh.material_override = mat
-	cyl_mesh.position = Vector3(0.0, 1.5, 0.0)
-	root.add_child(cyl_mesh)
-
-	# Health bar: green (filled) segment
-	var hp_fg := MeshInstance3D.new()
-	var hp_fg_quad := QuadMesh.new()
-	hp_fg_quad.size = Vector2(0.9, 0.10)
-	var hp_fg_mat := StandardMaterial3D.new()
-	hp_fg_mat.albedo_color = Color(0.2, 0.85, 0.2)
-	hp_fg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	hp_fg_mat.no_depth_test = true
-	hp_fg_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	hp_fg.mesh = hp_fg_quad
-	hp_fg.material_override = hp_fg_mat
-	hp_fg.position = Vector3(0.0, 2.1, 0.05)
-	root.add_child(hp_fg)
-
-	# Health bar: dark (missing HP) segment — tiled right of green, same z
-	var hp_bg := MeshInstance3D.new()
-	var hp_bg_quad := QuadMesh.new()
-	hp_bg_quad.size = Vector2(0.9, 0.10)
-	var hp_bg_mat := StandardMaterial3D.new()
-	hp_bg_mat.albedo_color = Color(0.08, 0.08, 0.08)
-	hp_bg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	hp_bg_mat.no_depth_test = true
-	hp_bg_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	hp_bg.mesh = hp_bg_quad
-	hp_bg.material_override = hp_bg_mat
-	hp_bg.position = Vector3(0.0, 2.1, 0.05)
-	root.add_child(hp_bg)
-
-	# Unit name label
-	var name_lbl := Label3D.new()
-	name_lbl.text = unit_name
-	name_lbl.font_size = 48
-	name_lbl.pixel_size = 0.006
-	if is_enemy:
-		name_lbl.modulate = Color(1.0, 0.35, 0.35)
-		name_lbl.outline_modulate = Color(0.3, 0.0, 0.0)
-		name_lbl.outline_size = 6
-	else:
-		name_lbl.modulate = Color.WHITE
-	name_lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	name_lbl.no_depth_test = true
-	name_lbl.position = Vector3(0.0, 2.45, 0.0)
-	root.add_child(name_lbl)
-
+	root.configure(unit_name, color, is_enemy)
 	return {
-		"marker_root": root,
-		"cylinder": cyl_mesh,
-		"hp_bg": hp_bg,
-		"hp_fg": hp_fg,
-		"name_label": name_lbl
+		"marker_root": root
 	}
 
 
@@ -710,10 +648,6 @@ func _recreate_all_markers() -> void:
 		var m := _create_unit_marker_node(unit_name, int(d["col"]), int(d["row"]),
 				d.get("color", Color(0.25, 0.55, 1.0)) as Color)
 		d["marker_root"] = m["marker_root"]
-		d["cylinder"]    = m["cylinder"]
-		d["hp_bg"]       = m["hp_bg"]
-		d["hp_fg"]       = m["hp_fg"]
-		d["name_label"]  = m["name_label"]
 		update_unit_org(unit_name, (d["unit"] as Unit).ORG)
 
 
@@ -731,19 +665,10 @@ func update_unit_org(unit_name: String, org: float) -> void:
 	var d: Dictionary = _units.get(unit_name, {})
 	if d.is_empty():
 		return
-	var hp_fg: MeshInstance3D = d.get("hp_fg")
-	var hp_bg: MeshInstance3D = d.get("hp_bg")
-	if not is_instance_valid(hp_fg) or not is_instance_valid(hp_bg):
+	var marker_root: UnitMarker = d.get("marker_root") as UnitMarker
+	if not is_instance_valid(marker_root):
 		return
-	const W := 0.9   # total bar width
-	var pct    := clampf(org / 100.0, 0.0, 1.0)
-	var fg_w   := W * pct
-	var bg_w   := W * (1.0 - pct)
-	# Resize meshes directly — avoids billboard/world-scale mismatch
-	(hp_fg.mesh as QuadMesh).size = Vector2(fg_w, 0.10)
-	hp_fg.position = Vector3(-W / 2.0 + fg_w / 2.0, 2.1, 0.05)
-	(hp_bg.mesh as QuadMesh).size = Vector2(bg_w, 0.10)
-	hp_bg.position = Vector3(W / 2.0 - bg_w / 2.0, 2.1, 0.05)
+	marker_root.set_org(org)
 
 
 # ── Public movement API ───────────────────────────────────────────────────────
