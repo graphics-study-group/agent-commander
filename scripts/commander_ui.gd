@@ -1163,7 +1163,41 @@ func _spawn_convoy(target_unit: Unit, is_player: bool, entry: Dictionary, hex_ma
 	})
 	if hex_map.has_method("add_convoy_marker"):
 		var convoy_color := Color(0.25, 0.55, 1.0) if is_player else Color(0.85, 0.15, 0.15)
+		var convoy_route_color := convoy_color.lerp(Color.WHITE, 0.4)
 		hex_map.add_convoy_marker(str(convoy_id), spawn_pos.x, spawn_pos.y, convoy_color)
+		if hex_map.has_method("set_convoy_route_color"):
+			hex_map.set_convoy_route_color(str(convoy_id), convoy_route_color)
+		if hex_map.has_method("set_convoy_route"):
+			hex_map.set_convoy_route(
+				str(convoy_id),
+				_build_convoy_route_tiles(spawn_pos.x, spawn_pos.y, path)
+			)
+
+
+func _build_convoy_route_tiles(start_col: int, start_row: int, path: Array) -> Array:
+	var raw: Array = []
+	raw.append([start_col, start_row])
+	for step in path:
+		if step is Array and (step as Array).size() >= 2:
+			raw.append([int(step[0]), int(step[1])])
+		elif step is Vector2i:
+			var point := step as Vector2i
+			raw.append([point.x, point.y])
+		elif step is Dictionary:
+			var route_step := step as Dictionary
+			if route_step.has("col") and route_step.has("row"):
+				raw.append([int(route_step["col"]), int(route_step["row"])])
+
+	var compact: Array = []
+	var has_last := false
+	var last := Vector2i.ZERO
+	for step in raw:
+		var cur := Vector2i(int(step[0]), int(step[1]))
+		if not has_last or cur != last:
+			compact.append([cur.x, cur.y])
+			last = cur
+			has_last = true
+	return compact
 
 
 func _advance_convoys(game_delta: float) -> void:
@@ -1214,11 +1248,16 @@ func _advance_convoys(game_delta: float) -> void:
 			to_remove.append(convoy)
 			continue
 
-		# Calculate next step
+		# Calculate current planned route
 		var path: Array = hex_map.calc_path(cur_col, cur_row, target_pos.x, target_pos.y)
 		if path.is_empty():
 			to_remove.append(convoy)
 			continue
+		if hex_map.has_method("set_convoy_route"):
+			hex_map.set_convoy_route(
+				str(convoy["id"]),
+				_build_convoy_route_tiles(cur_col, cur_row, path)
+			)
 
 		# Determine next cell (path may or may not include current pos)
 		var step_idx := 0
@@ -1238,6 +1277,12 @@ func _advance_convoys(game_delta: float) -> void:
 		convoy["row"] = next_row
 		if hex_map.has_method("update_convoy_marker"):
 			hex_map.update_convoy_marker(str(convoy["id"]), next_col, next_row)
+		if hex_map.has_method("set_convoy_route"):
+			var remaining_path := path.slice(step_idx + 1)
+			hex_map.set_convoy_route(
+				str(convoy["id"]),
+				_build_convoy_route_tiles(next_col, next_row, remaining_path)
+			)
 
 		# Check interception by enemy units at new position
 		var is_player: bool = convoy["is_player"]

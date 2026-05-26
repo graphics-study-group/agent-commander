@@ -1642,6 +1642,30 @@ func add_convoy_marker(convoy_id: String, col: int, row: int, color: Color) -> v
 	_convoy_markers[convoy_id] = root
 
 
+func set_convoy_route(convoy_id: String, route_tiles: Array) -> void:
+	var root: SupplyMarker = _convoy_markers.get(convoy_id) as SupplyMarker
+	if not is_instance_valid(root):
+		return
+	if route_tiles.size() < 2:
+		root.clear_route()
+		return
+	root.set_route_tiles(route_tiles, _grid_cols, _grid_rows)
+
+
+func set_convoy_route_color(convoy_id: String, color: Color) -> void:
+	var root: SupplyMarker = _convoy_markers.get(convoy_id) as SupplyMarker
+	if not is_instance_valid(root):
+		return
+	root.set_route_color(color)
+
+
+func clear_convoy_route(convoy_id: String) -> void:
+	var root: SupplyMarker = _convoy_markers.get(convoy_id) as SupplyMarker
+	if not is_instance_valid(root):
+		return
+	root.clear_route()
+
+
 func update_convoy_marker(convoy_id: String, col: int, row: int) -> void:
 	var root: Node3D = _convoy_markers.get(convoy_id) as Node3D
 	if not is_instance_valid(root):
@@ -1658,6 +1682,8 @@ func update_convoy_marker(convoy_id: String, col: int, row: int) -> void:
 func remove_convoy_marker(convoy_id: String) -> void:
 	var root: Node3D = _convoy_markers.get(convoy_id) as Node3D
 	if is_instance_valid(root):
+		if root is SupplyMarker:
+			(root as SupplyMarker).clear_route()
 		root.queue_free()
 	_convoy_markers.erase(convoy_id)
 
