@@ -44,7 +44,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_apply_zoom()
 				get_viewport().set_input_as_handled()
 				return
-		if mb.button_index == MOUSE_BUTTON_LEFT:
+		if mb.button_index == MOUSE_BUTTON_MIDDLE:
 			_is_dragging = mb.pressed
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion and _is_dragging:
