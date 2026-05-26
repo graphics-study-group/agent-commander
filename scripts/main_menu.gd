@@ -4,6 +4,7 @@ const GAME_SCENE_PATH := "res://scenes/game_main.tscn"
 const EDITOR_SCENE_PATH := "res://scenes/map_editor.tscn"
 const RES_MAP_DIR := "res://maps"
 const USER_MAP_DIR := "user://maps"
+const GAME_START_BGM_LEAD_SEC := 0.85
 
 @onready var _map_option: OptionButton = $CenterPanel/Panel/PanelVBox/MapRow/MapOption
 @onready var _status_label: Label = $CenterPanel/Panel/PanelVBox/StatusLabel
@@ -16,6 +17,9 @@ func _ready() -> void:
 	if _map_option == null or _status_label == null or _refresh_btn == null or _editor_btn == null or _play_btn == null:
 		push_error("Main menu UI node binding failed. Check main_menu.tscn node paths.")
 		return
+	var bgm := get_node_or_null("/root/BgmController")
+	if bgm != null and bgm.has_method("play_menu_loop"):
+		bgm.call("play_menu_loop")
 
 	_refresh_btn.pressed.connect(_on_refresh_pressed)
 	_editor_btn.pressed.connect(_on_editor_pressed)
@@ -54,6 +58,9 @@ func _on_refresh_pressed() -> void:
 
 
 func _on_editor_pressed() -> void:
+	var bgm := get_node_or_null("/root/BgmController")
+	if bgm != null and bgm.has_method("stop_music_smooth"):
+		bgm.call("stop_music_smooth")
 	get_tree().change_scene_to_file(EDITOR_SCENE_PATH)
 
 
@@ -71,4 +78,8 @@ func _on_play_pressed() -> void:
 	var app_state := get_node_or_null("/root/AppState")
 	if app_state != null:
 		app_state.set("selected_map_path", map_path)
+	var bgm := get_node_or_null("/root/BgmController")
+	if bgm != null and bgm.has_method("play_game_loop"):
+		bgm.call("play_game_loop")
+		await get_tree().create_timer(GAME_START_BGM_LEAD_SEC, true, false, true).timeout
 	get_tree().change_scene_to_file(GAME_SCENE_PATH)

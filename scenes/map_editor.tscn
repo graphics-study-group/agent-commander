@@ -1,135 +1,153 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://cjv82soieii46"]
 
-[ext_resource type="Script" path="res://scripts/map_editor.gd" id="1_editor"]
-[ext_resource type="PackedScene" path="res://scenes/Camera.tscn" id="2_cam"]
-[ext_resource type="Script" path="res://scripts/hex_map.gd" id="3_hex"]
+[ext_resource type="Script" uid="uid://cqpwv5u52sm1b" path="res://scripts/map_editor.gd" id="1_editor"]
+[ext_resource type="PackedScene" uid="uid://cwctcymjbaf7f" path="res://scenes/Camera.tscn" id="2_cam"]
+[ext_resource type="Script" uid="uid://co5386b6e8wtk" path="res://scripts/hex_map.gd" id="3_hex"]
+[ext_resource type="Texture2D" uid="uid://b78u6fu34fscv" path="res://assets/main_menu_background.png" id="4_bg"]
 
-[node name="Root" type="Node3D"]
+[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_8qdu6"]
+panorama = ExtResource("4_bg")
+energy_multiplier = 0.35
+
+[sub_resource type="Sky" id="Sky_bg"]
+sky_material = SubResource("PanoramaSkyMaterial_8qdu6")
+
+[sub_resource type="Environment" id="Environment_o22ft"]
+background_mode = 2
+sky = SubResource("Sky_bg")
+sky_rotation = Vector3(0, -1.3124876, 1.0314896)
+
+[node name="Root" type="Node3D" unique_id=491044158]
 script = ExtResource("1_editor")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(-4.3711385e-08, 0.70710677, -0.7071067, 0, 0.70710677, 0.7071067, 0.99999994, 3.090862e-08, -3.0908616e-08, -20.795395, 13.268564, 0)
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=380787338]
+environment = SubResource("Environment_o22ft")
 
-[node name="HexagonalMap" type="Node3D" parent="."]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1257710629]
+transform = Transform3D(-4.3711385e-08, 0.70710677, -0.7071067, 0, 0.70710677, 0.7071067, 0.99999994, 3.090862e-08, -3.0908616e-08, -20.795395, 13.268564, 0)
+shadow_enabled = true
+
+[node name="HexagonalMap" type="Node3D" parent="." unique_id=1500730573]
 script = ExtResource("3_hex")
 
-[node name="CameraRoot" parent="." instance=ExtResource("2_cam")]
+[node name="CameraRoot" parent="." unique_id=139902687 instance=ExtResource("2_cam")]
 
-[node name="HighlightRoot" type="Node3D" parent="."]
+[node name="HighlightRoot" type="Node3D" parent="." unique_id=2019756838]
 
-[node name="TileHighlight" type="MeshInstance3D" parent="HighlightRoot"]
+[node name="TileHighlight" type="MeshInstance3D" parent="HighlightRoot" unique_id=1790282327]
 visible = false
 
-[node name="LinkHighlight" type="MeshInstance3D" parent="HighlightRoot"]
+[node name="LinkHighlight" type="MeshInstance3D" parent="HighlightRoot" unique_id=1723655627]
 visible = false
 
-[node name="UILayer" type="CanvasLayer" parent="."]
+[node name="UILayer" type="CanvasLayer" parent="." unique_id=2081953662]
 layer = 2
 
-[node name="EditorUI" type="PanelContainer" parent="UILayer"]
+[node name="EditorUI" type="PanelContainer" parent="UILayer" unique_id=615037867]
 anchors_preset = 1
 anchor_left = 1.0
+anchor_right = 1.0
 offset_left = -360.0
 offset_right = -16.0
 offset_bottom = 700.0
 
-[node name="VBox" type="VBoxContainer" parent="UILayer/EditorUI"]
+[node name="VBox" type="VBoxContainer" parent="UILayer/EditorUI" unique_id=412703721]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Title" type="Label" parent="UILayer/EditorUI/VBox"]
+[node name="Title" type="Label" parent="UILayer/EditorUI/VBox" unique_id=1593610756]
 layout_mode = 2
 text = "Map Editor"
 
-[node name="SizeRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox"]
+[node name="SizeRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox" unique_id=279748656]
 layout_mode = 2
 
-[node name="ColsLabel" type="Label" parent="UILayer/EditorUI/VBox/SizeRow"]
+[node name="ColsLabel" type="Label" parent="UILayer/EditorUI/VBox/SizeRow" unique_id=496315294]
 layout_mode = 2
 text = "Cols"
 
-[node name="ColsSpin" type="SpinBox" parent="UILayer/EditorUI/VBox/SizeRow"]
+[node name="ColsSpin" type="SpinBox" parent="UILayer/EditorUI/VBox/SizeRow" unique_id=1175623573]
 layout_mode = 2
 min_value = 4.0
 max_value = 128.0
 value = 16.0
 
-[node name="RowsLabel" type="Label" parent="UILayer/EditorUI/VBox/SizeRow"]
+[node name="RowsLabel" type="Label" parent="UILayer/EditorUI/VBox/SizeRow" unique_id=320520302]
 layout_mode = 2
 text = "Rows"
 
-[node name="RowsSpin" type="SpinBox" parent="UILayer/EditorUI/VBox/SizeRow"]
+[node name="RowsSpin" type="SpinBox" parent="UILayer/EditorUI/VBox/SizeRow" unique_id=1388121925]
 layout_mode = 2
 min_value = 4.0
 max_value = 128.0
 value = 16.0
 
-[node name="AllPlainCheck" type="CheckBox" parent="UILayer/EditorUI/VBox"]
+[node name="AllPlainCheck" type="CheckBox" parent="UILayer/EditorUI/VBox" unique_id=1720439107]
 layout_mode = 2
 text = "Generate all plain"
 
-[node name="GenerateButton" type="Button" parent="UILayer/EditorUI/VBox"]
+[node name="GenerateButton" type="Button" parent="UILayer/EditorUI/VBox" unique_id=1894263382]
 layout_mode = 2
 text = "Generate Random"
 
-[node name="PaintRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox"]
+[node name="PaintRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox" unique_id=914968918]
 layout_mode = 2
 
-[node name="PaintLabel" type="Label" parent="UILayer/EditorUI/VBox/PaintRow"]
+[node name="PaintLabel" type="Label" parent="UILayer/EditorUI/VBox/PaintRow" unique_id=820757256]
 layout_mode = 2
 text = "Paint"
 
-[node name="TerrainOption" type="OptionButton" parent="UILayer/EditorUI/VBox/PaintRow"]
+[node name="TerrainOption" type="OptionButton" parent="UILayer/EditorUI/VBox/PaintRow" unique_id=1581504185]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="ModeRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox"]
+[node name="ModeRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox" unique_id=555830236]
 layout_mode = 2
 
-[node name="ModeLabel" type="Label" parent="UILayer/EditorUI/VBox/ModeRow"]
+[node name="ModeLabel" type="Label" parent="UILayer/EditorUI/VBox/ModeRow" unique_id=1217019606]
 layout_mode = 2
 text = "Mode"
 
-[node name="ModeOption" type="OptionButton" parent="UILayer/EditorUI/VBox/ModeRow"]
+[node name="ModeOption" type="OptionButton" parent="UILayer/EditorUI/VBox/ModeRow" unique_id=630771001]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="RoadRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox"]
+[node name="RoadRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox" unique_id=713519614]
 layout_mode = 2
 
-[node name="RoadOpLabel" type="Label" parent="UILayer/EditorUI/VBox/RoadRow"]
+[node name="RoadOpLabel" type="Label" parent="UILayer/EditorUI/VBox/RoadRow" unique_id=854125753]
 layout_mode = 2
 text = "Road"
 
-[node name="RoadOpOption" type="OptionButton" parent="UILayer/EditorUI/VBox/RoadRow"]
+[node name="RoadOpOption" type="OptionButton" parent="UILayer/EditorUI/VBox/RoadRow" unique_id=1565835048]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="RoadDirLabel" type="Label" parent="UILayer/EditorUI/VBox/RoadRow"]
+[node name="RoadDirLabel" type="Label" parent="UILayer/EditorUI/VBox/RoadRow" unique_id=1307553893]
 layout_mode = 2
 text = "Dir"
 
-[node name="RoadDirOption" type="OptionButton" parent="UILayer/EditorUI/VBox/RoadRow"]
+[node name="RoadDirOption" type="OptionButton" parent="UILayer/EditorUI/VBox/RoadRow" unique_id=1217083655]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="SaveRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox"]
+[node name="SaveRow" type="HBoxContainer" parent="UILayer/EditorUI/VBox" unique_id=1864334565]
 layout_mode = 2
 
-[node name="NameLabel" type="Label" parent="UILayer/EditorUI/VBox/SaveRow"]
+[node name="NameLabel" type="Label" parent="UILayer/EditorUI/VBox/SaveRow" unique_id=1398323586]
 layout_mode = 2
 text = "Name"
 
-[node name="NameEdit" type="LineEdit" parent="UILayer/EditorUI/VBox/SaveRow"]
+[node name="NameEdit" type="LineEdit" parent="UILayer/EditorUI/VBox/SaveRow" unique_id=343546145]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "new_map"
 
-[node name="SaveButton" type="Button" parent="UILayer/EditorUI/VBox"]
+[node name="SaveButton" type="Button" parent="UILayer/EditorUI/VBox" unique_id=1877558001]
 layout_mode = 2
 text = "Save Map (user://maps)"
 
-[node name="StatusLabel" type="Label" parent="UILayer/EditorUI/VBox"]
+[node name="StatusLabel" type="Label" parent="UILayer/EditorUI/VBox" unique_id=281111093]
 layout_mode = 2
 text = "Ready"
 autowrap_mode = 2

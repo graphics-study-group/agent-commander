@@ -20,6 +20,8 @@ const TILE_SCENE_FOREST := preload("res://scenes/tiles/ForestTile.tscn")
 const TILE_SCENE_MOUNTAIN := preload("res://scenes/tiles/MountainTile.tscn")
 const TILE_SCENE_WATER := preload("res://scenes/tiles/WaterTile.tscn")
 const TILE_SCENE_CITY := preload("res://scenes/tiles/CityTile.tscn")
+const UNIT_MARKER_SCENE := preload("res://scenes/units/UnitMarker.tscn")
+const SUPPLY_MARKER_SCENE := preload("res://scenes/units/SupplyMarker.tscn")
 
 @export var auto_generate_on_ready := true
 @export_file("*.tres", "*.res") var startup_map_path := ""
@@ -34,9 +36,8 @@ var _spawn_row := 8
 var player_unit_count: int = 2
 var enemy_unit_count: int = 2
 
-# unit_name → {unit, col, row, color, marker_root, cylinder, name_label,
-#              hp_bg, hp_fg, move_queue, current_tween, is_moving,
-#              speed_buff_kmh, speed_buff_hexes}
+# unit_name → {unit, col, row, color, marker_root, move_queue, current_tween,
+#              is_moving, speed_buff_kmh, speed_buff_hexes}
 var _units: Dictionary = {}
 var _frozen_units: Dictionary = {}  # unit_name → true (blocks movement while in battle)
 var _unit_templates: Array = []     # Array[Dictionary] — initial unit configs saved with map
@@ -115,26 +116,18 @@ func _process(_delta: float) -> void:
 		else:
 			_tooltip.visible = false
 
-	# Hex hover: update hovered cell via ray→ground-plane intersection
+	# Hex hover: update hovered cell via tile collision picking
 	if _hover_highlight != null:
-		var ray_from := camera.project_ray_origin(mouse_pos)
-		var ray_dir  := camera.project_ray_normal(mouse_pos)
-		var show := false
-		if abs(ray_dir.y) > 0.001:
-			var t := -ray_from.y / ray_dir.y
-			if t > 0.0:
-				var hit := ray_from + ray_dir * t
-				var hx  := world_to_hex(hit)
-				if _in_bounds(hx.x, hx.y):
-					_hovered_hex = hx
-					var wpos := hex_to_world(hx.x, hx.y)
-					_hover_highlight.position = Vector3(wpos.x, 1.03, wpos.z)
-					_hover_highlight.visible = true
-					_hover_label.text = "(%d,%d)" % [hx.x, hx.y]
-					_hover_label.position = Vector3(wpos.x, 1.7, wpos.z)
-					_hover_label.visible = true
-					show = true
-		if not show:
+		var tile := _pick_tile_under_cursor()
+		if tile != null and _in_bounds(tile.grid_col, tile.grid_row):
+			_hovered_hex = Vector2i(tile.grid_col, tile.grid_row)
+			var wpos := hex_to_world(tile.grid_col, tile.grid_row)
+			_hover_highlight.position = Vector3(wpos.x, 1.03, wpos.z)
+			_hover_highlight.visible = true
+			_hover_label.text = "(%d,%d)" % [tile.grid_col, tile.grid_row]
+			_hover_label.position = Vector3(wpos.x, 1.7, wpos.z)
+			_hover_label.visible = true
+		else:
 			_hovered_hex = Vector2i(-1, -1)
 			_hover_highlight.visible = false
 			_hover_label.visible = false
@@ -154,8 +147,36 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
-			if _in_bounds(_hovered_hex.x, _hovered_hex.y):
-				hex_coord_selected.emit(_hovered_hex.x, _hovered_hex.y)
+			var tile := _pick_tile_under_cursor()
+			if tile != null and _in_bounds(tile.grid_col, tile.grid_row):
+				_hovered_hex = Vector2i(tile.grid_col, tile.grid_row)
+				hex_coord_selected.emit(tile.grid_col, tile.grid_row)
+
+
+func _pick_tile_under_cursor() -> TileBase:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return null
+	var mouse_pos := get_viewport().get_mouse_position()
+	var from := camera.project_ray_origin(mouse_pos)
+	var to := from + camera.project_ray_normal(mouse_pos) * 2000.0
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	query.collide_with_areas = true
+	query.collide_with_bodies = true
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return null
+	var collider := hit.get("collider") as Node
+	return _find_tile_node(collider)
+
+
+func _find_tile_node(node: Node) -> TileBase:
+	var cur := node
+	while cur != null:
+		if cur is TileBase:
+			return cur as TileBase
+		cur = cur.get_parent()
+	return null
 
 
 # ── Unit registration ─────────────────────────────────────────────────────────
@@ -179,11 +200,6 @@ func register_unit(unit: Unit, color: Color = Color(0.25, 0.55, 1.0),
 		"color": color,
 		"is_enemy": is_enemy,
 		"marker_root": m["marker_root"],
-		"cylinder": m["cylinder"],
-		"name_label": m["name_label"],
-		"hp_bg": m["hp_bg"],
-		"hp_str": m["hp_str"],
-		"hp_fg": m["hp_fg"],
 		"move_queue": [],
 		"current_tween": null,
 		"is_moving": false,
@@ -324,6 +340,7 @@ func _rebuild_visuals() -> void:
 	_create_coord_labels()
 	refresh_region_labels()
 	_rebuild_victory_marker()
+	_enable_shadows_on_subtree(_generated_root)
 
 
 func _clear_generated_root() -> void:
@@ -333,6 +350,19 @@ func _clear_generated_root() -> void:
 	_generated_root.name = "GeneratedMap"
 	add_child(_generated_root)
 	_tile_nodes = []
+
+
+func _enable_shadows_on_subtree(root_node: Node) -> void:
+	if not is_instance_valid(root_node):
+		return
+	var stack: Array = [root_node]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n is GeometryInstance3D:
+			(n as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		for c in n.get_children():
+			if c is Node:
+				stack.append(c)
 
 
 func _generate_terrain() -> void:
@@ -579,6 +609,7 @@ func _generate_tiles() -> void:
 			tile.configure(col, row, _terrain[row][col], _roads[row][col], self)
 			_tile_nodes[row][col] = tile
 			_generated_root.add_child(tile)
+			_enable_shadows_on_subtree(tile)
 
 
 func _replace_tile_node(col: int, row: int) -> void:
@@ -601,6 +632,7 @@ func _replace_tile_node(col: int, row: int) -> void:
 	row_data[col] = tile
 	_tile_nodes[row] = row_data
 	_generated_root.add_child(tile)
+	_enable_shadows_on_subtree(tile)
 
 
 func _refresh_tile_and_neighbors(col: int, row: int) -> void:
@@ -632,94 +664,19 @@ func _get_tile_node(col: int, row: int) -> TileBase:
 
 func _create_unit_marker_node(unit_name: String, col: int, row: int, color: Color,
 		is_enemy: bool = false) -> Dictionary:
-	var root := Node3D.new()
-	root.name = "Marker_" + unit_name
-	root.position = hex_to_world(col, row)
+	if UNIT_MARKER_SCENE == null:
+		push_warning("HexMap: UnitMarker scene is missing.")
+		return {}
+	var root := UNIT_MARKER_SCENE.instantiate() as UnitMarker
+	if root == null:
+		push_warning("HexMap: failed to instantiate UnitMarker scene.")
+		return {}
+	root.position = _unit_world_pos(col, row)
 	_generated_root.add_child(root)
-
-	# Cylinder body
-	var cyl_mesh := MeshInstance3D.new()
-	var cyl := CylinderMesh.new()
-	cyl.top_radius = 0.18
-	cyl.bottom_radius = 0.18
-	cyl.height = 0.45
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.emission_enabled = true
-	mat.emission = color * 0.5
-	cyl_mesh.mesh = cyl
-	cyl_mesh.material_override = mat
-	cyl_mesh.position = Vector3(0.0, 1.5, 0.0)
-	root.add_child(cyl_mesh)
-
-	# Health bar: black background (full width, static)
-	var hp_bg := MeshInstance3D.new()
-	var hp_bg_quad := QuadMesh.new()
-	hp_bg_quad.size = Vector2(0.9, 0.10)
-	var hp_bg_mat := StandardMaterial3D.new()
-	hp_bg_mat.albedo_color = Color(0.06, 0.06, 0.06)
-	hp_bg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	hp_bg_mat.no_depth_test = true
-	hp_bg_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	hp_bg_mat.render_priority = 0
-	hp_bg.mesh = hp_bg_quad
-	hp_bg.material_override = hp_bg_mat
-	hp_bg.position = Vector3(0.0, 2.1, 0.05)
-	root.add_child(hp_bg)
-
-	# Health bar: red STR bar (behind green)
-	var hp_str := MeshInstance3D.new()
-	var hp_str_quad := QuadMesh.new()
-	hp_str_quad.size = Vector2(0.9, 0.10)
-	var hp_str_mat := StandardMaterial3D.new()
-	hp_str_mat.albedo_color = Color(0.85, 0.15, 0.1)
-	hp_str_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	hp_str_mat.no_depth_test = true
-	hp_str_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	hp_str_mat.render_priority = 1
-	hp_str.mesh = hp_str_quad
-	hp_str.material_override = hp_str_mat
-	hp_str.position = Vector3(0.0, 2.1, 0.05)
-	root.add_child(hp_str)
-
-	# Health bar: green ORG bar (front)
-	var hp_fg := MeshInstance3D.new()
-	var hp_fg_quad := QuadMesh.new()
-	hp_fg_quad.size = Vector2(0.9, 0.10)
-	var hp_fg_mat := StandardMaterial3D.new()
-	hp_fg_mat.albedo_color = Color(0.2, 0.85, 0.2)
-	hp_fg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	hp_fg_mat.no_depth_test = true
-	hp_fg_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	hp_fg_mat.render_priority = 2
-	hp_fg.mesh = hp_fg_quad
-	hp_fg.material_override = hp_fg_mat
-	hp_fg.position = Vector3(0.0, 2.1, 0.05)
-	root.add_child(hp_fg)
-
-	# Unit name label
-	var name_lbl := Label3D.new()
-	name_lbl.text = unit_name
-	name_lbl.font_size = 48
-	name_lbl.pixel_size = 0.006
-	if is_enemy:
-		name_lbl.modulate = Color(1.0, 0.35, 0.35)
-		name_lbl.outline_modulate = Color(0.3, 0.0, 0.0)
-		name_lbl.outline_size = 6
-	else:
-		name_lbl.modulate = Color.WHITE
-	name_lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	name_lbl.no_depth_test = true
-	name_lbl.position = Vector3(0.0, 2.45, 0.0)
-	root.add_child(name_lbl)
-
+	root.configure(unit_name, color, is_enemy)
+	_enable_shadows_on_subtree(root)
 	return {
-		"marker_root": root,
-		"cylinder": cyl_mesh,
-		"hp_bg": hp_bg,
-		"hp_str": hp_str,
-		"hp_fg": hp_fg,
-		"name_label": name_lbl
+		"marker_root": root
 	}
 
 
@@ -729,11 +686,6 @@ func _recreate_all_markers() -> void:
 		var m := _create_unit_marker_node(unit_name, int(d["col"]), int(d["row"]),
 				d.get("color", Color(0.25, 0.55, 1.0)) as Color)
 		d["marker_root"] = m["marker_root"]
-		d["cylinder"]    = m["cylinder"]
-		d["hp_bg"]       = m["hp_bg"]
-		d["hp_str"]      = m["hp_str"]
-		d["hp_fg"]       = m["hp_fg"]
-		d["name_label"]  = m["name_label"]
 		update_unit_org(unit_name, (d["unit"] as Unit).ORG)
 
 
@@ -744,28 +696,37 @@ func _update_marker_pos_for(unit_name: String) -> void:
 	var mr: Node3D = d.get("marker_root")
 	if not is_instance_valid(mr):
 		return
-	mr.position = hex_to_world(int(d["col"]), int(d["row"]))
+	mr.position = _unit_world_pos(int(d["col"]), int(d["row"]))
+
+
+func _unit_world_pos(col: int, row: int) -> Vector3:
+	var pos := hex_to_world(col, row)
+	pos.y += 0.9
+	return pos
+
+
+func _face_marker_towards(marker_root: Node3D, target_pos: Vector3) -> void:
+	if not is_instance_valid(marker_root):
+		return
+	if marker_root is UnitMarker:
+		(marker_root as UnitMarker).face_towards(target_pos)
+		return
+	var from := marker_root.global_position
+	var flat_target := Vector3(target_pos.x, from.y, target_pos.z)
+	if from.distance_squared_to(flat_target) < 0.000001:
+		return
+	# Keep rotation on horizontal plane only.
+	marker_root.look_at(flat_target, Vector3.UP)
 
 
 func update_unit_org(unit_name: String, org: float) -> void:
 	var d: Dictionary = _units.get(unit_name, {})
 	if d.is_empty():
 		return
-	var hp_fg: MeshInstance3D  = d.get("hp_fg")
-	var hp_str: MeshInstance3D = d.get("hp_str")
-	if not is_instance_valid(hp_fg) or not is_instance_valid(hp_str):
+	var marker_root: UnitMarker = d.get("marker_root") as UnitMarker
+	if not is_instance_valid(marker_root):
 		return
-	var u: Unit = d.get("unit") as Unit
-	var str_val: float = u.STR if u != null else 100.0
-	const W := 0.9
-	var org_pct := clampf(org / 100.0, 0.0, 1.0)
-	var str_pct := clampf(str_val / 100.0, 0.0, 1.0)
-	var org_w   := W * org_pct
-	var str_w   := W * str_pct
-	(hp_fg.mesh as QuadMesh).size  = Vector2(org_w, 0.10)
-	hp_fg.position = Vector3(-W / 2.0 + org_w / 2.0, 2.1, 0.05)
-	(hp_str.mesh as QuadMesh).size = Vector2(str_w, 0.10)
-	hp_str.position = Vector3(-W / 2.0 + str_w / 2.0, 2.1, 0.05)
+	marker_root.set_org(org)
 
 
 # ── Public movement API ───────────────────────────────────────────────────────
@@ -1202,9 +1163,10 @@ func _execute_next_move(unit_name: String) -> void:
 		to_tile.on_unit_enter(u)
 
 	var travel_time := _travel_time_for(unit_name, col, row, nc, nr)
-	var target_pos  := hex_to_world(nc, nr)
+	var target_pos  := _unit_world_pos(nc, nr)
 
 	var marker_root: Node3D = d["marker_root"]
+	_face_marker_towards(marker_root, target_pos)
 	var tween := create_tween()
 	d["current_tween"] = tween
 	tween.tween_property(marker_root, "position", target_pos, travel_time)
@@ -1449,6 +1411,7 @@ func _rebuild_victory_marker() -> void:
 	lbl.no_depth_test = true
 	lbl.position      = Vector3(0.0, 0.7, 0.0)
 	root.add_child(lbl)
+	_enable_shadows_on_subtree(root)
 	add_child(root)
 	_victory_city_marker = root
 
@@ -1460,21 +1423,17 @@ func add_convoy_marker(convoy_id: String, col: int, row: int, color: Color) -> v
 		return
 	if not is_instance_valid(_generated_root):
 		return
-	var root := Node3D.new()
-	root.name = "Convoy_" + convoy_id
+	if SUPPLY_MARKER_SCENE == null:
+		push_warning("HexMap: SupplyMarker scene is missing.")
+		return
+	var root := SUPPLY_MARKER_SCENE.instantiate() as SupplyMarker
+	if root == null:
+		push_warning("HexMap: failed to instantiate SupplyMarker scene.")
+		return
 	root.position = hex_to_world(col, row)
-	var box_mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(0.22, 0.22, 0.22)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color     = color
-	mat.emission_enabled = true
-	mat.emission         = color * 0.6
-	box_mesh.mesh              = box
-	box_mesh.material_override = mat
-	box_mesh.position          = Vector3(0.0, 1.38, 0.0)
-	root.add_child(box_mesh)
 	_generated_root.add_child(root)
+	root.configure(convoy_id, color)
+	_enable_shadows_on_subtree(root)
 	_convoy_markers[convoy_id] = root
 
 
@@ -1482,8 +1441,13 @@ func update_convoy_marker(convoy_id: String, col: int, row: int) -> void:
 	var root: Node3D = _convoy_markers.get(convoy_id) as Node3D
 	if not is_instance_valid(root):
 		return
+	var target_pos := hex_to_world(col, row)
+	if root is SupplyMarker:
+		(root as SupplyMarker).face_towards(target_pos)
+	else:
+		_face_marker_towards(root, target_pos)
 	var tween := create_tween()
-	tween.tween_property(root, "position", hex_to_world(col, row), 1.0)
+	tween.tween_property(root, "position", target_pos, 1.0)
 
 
 func remove_convoy_marker(convoy_id: String) -> void:

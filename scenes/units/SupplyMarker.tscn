@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://dhelpoauuncak"]
+
+[ext_resource type="Script" uid="uid://41eg2br2ng06" path="res://scripts/supply_marker.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://vuu8jw7alo1o" path="res://scenes/units/UnitVisualSupply.tscn" id="2_visual"]
+
+[node name="SupplyMarker" type="Node3D" unique_id=254485884]
+script = ExtResource("1_script")
+
+[node name="Visual" parent="." unique_id=1977080381 instance=ExtResource("2_visual")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.38, 0)
