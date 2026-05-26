@@ -436,8 +436,7 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_lqi1n")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_woe7l"]
-shading_mode = 0
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_og360"]
 albedo_color = Color(0.25, 0.55, 1, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_nlbap"]
@@ -518,8 +517,7 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_ctng2")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_g08ft"]
-shading_mode = 0
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8qdc0"]
 albedo_color = Color(0.25, 0.55, 1, 1)
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_prdpn"]
@@ -554,8 +552,7 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_prdpn")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_yr7ac"]
-shading_mode = 0
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rygoh"]
 albedo_color = Color(0.25, 0.55, 1, 1)
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_387ob"]
@@ -1082,8 +1079,7 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_iabxc")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0oqrv"]
-shading_mode = 0
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tewaf"]
 albedo_color = Color(0.25, 0.55, 1, 1)
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_1d1i3"]
@@ -1154,8 +1150,7 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_803vr")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_opk0a"]
-shading_mode = 0
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vc668"]
 albedo_color = Color(0.25, 0.55, 1, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_18pgo"]
@@ -1296,8 +1291,7 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_0qwyv")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_k74kt"]
-shading_mode = 0
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3s22t"]
 albedo_color = Color(0.25, 0.55, 1, 1)
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_t7obm"]
@@ -1335,162 +1329,165 @@ shadow_mesh = SubResource("ArrayMesh_t7obm")
 [node name="UnitVisualSpearman" type="Node3D" unique_id=581394494]
 script = ExtResource("1_script")
 
-[node name="round_base_body_001" type="MeshInstance3D" parent="." unique_id=1182381171]
+[node name="root" type="Node3D" parent="." unique_id=602321345]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
+
+[node name="round_base_body_001" type="MeshInstance3D" parent="root" unique_id=1182381171]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.09, 0)
 mesh = SubResource("ArrayMesh_og360")
 
-[node name="round_base_top_rough_001" type="MeshInstance3D" parent="." unique_id=831881332]
+[node name="round_base_top_rough_001" type="MeshInstance3D" parent="root" unique_id=831881332]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.195, 0)
 mesh = SubResource("ArrayMesh_8qdc0")
 
-[node name="round_base_rim_001" type="MeshInstance3D" parent="." unique_id=1877211885]
+[node name="round_base_rim_001" type="MeshInstance3D" parent="root" unique_id=1877211885]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.18, 0)
 mesh = SubResource("ArrayMesh_rygoh")
 
-[node name="base_pebble_1_002" type="MeshInstance3D" parent="." unique_id=1500304691]
+[node name="base_pebble_1_002" type="MeshInstance3D" parent="root" unique_id=1500304691]
 transform = Transform3D(1.3, 0, 0, 0, 0.35, 0, 0, 0, 0.9, 0.4428, 0.225, 0)
 mesh = SubResource("ArrayMesh_tewaf")
 
-[node name="base_pebble_2_002" type="MeshInstance3D" parent="." unique_id=167651160]
+[node name="base_pebble_2_002" type="MeshInstance3D" parent="root" unique_id=167651160]
 transform = Transform3D(0.4017221, 0, 0.8559509, 0, 0.35, 0, -1.2363734, 0, 0.2781153, 0.13683273, 0.225, -0.42112783)
 mesh = SubResource("ArrayMesh_vc668")
 
-[node name="base_pebble_3_002" type="MeshInstance3D" parent="." unique_id=845023449]
+[node name="base_pebble_3_002" type="MeshInstance3D" parent="root" unique_id=845023449]
 transform = Transform3D(-1.0517222, 0, 0.52900666, 0, 0.35, 0, -0.7641207, 0, -0.7281153, -0.35823274, 0.225, -0.2602713)
 mesh = SubResource("ArrayMesh_3s22t")
 
-[node name="base_pebble_4_002" type="MeshInstance3D" parent="." unique_id=2084018460]
+[node name="base_pebble_4_002" type="MeshInstance3D" parent="root" unique_id=2084018460]
 transform = Transform3D(-1.0517219, 0, -0.52900684, 0, 0.35, 0, 0.764121, 0, -0.7281152, -0.35823274, 0.225, 0.2602713)
 mesh = SubResource("ArrayMesh_w380i")
 
-[node name="base_pebble_5_002" type="MeshInstance3D" parent="." unique_id=1759873913]
+[node name="base_pebble_5_002" type="MeshInstance3D" parent="root" unique_id=1759873913]
 transform = Transform3D(0.40172213, 0, -0.8559509, 0, 0.35, 0, 1.2363735, 0, 0.2781153, 0.13683273, 0.225, 0.42112783)
 mesh = SubResource("ArrayMesh_yuhkw")
 
-[node name="spearman_left_leg" type="MeshInstance3D" parent="." unique_id=1651918310]
+[node name="spearman_left_leg" type="MeshInstance3D" parent="root" unique_id=1651918310]
 transform = Transform3D(0.9284766, -0.03789656, -0.36945242, 7.0780516e-08, 0.99478036, -0.102039374, 0.37139094, 0.09474114, 0.9236303, -0.17, 0.5175, -0.005)
 mesh = SubResource("ArrayMesh_ap4ju")
 
-[node name="spearman_right_leg" type="MeshInstance3D" parent="." unique_id=990459754]
+[node name="spearman_right_leg" type="MeshInstance3D" parent="root" unique_id=990459754]
 transform = Transform3D(0.9284766, 0.03789656, 0.36945242, -7.0780516e-08, 0.99478036, -0.102039374, -0.37139094, 0.09474114, 0.9236303, 0.17, 0.5175, -0.005)
 mesh = SubResource("ArrayMesh_mjoet")
 
-[node name="spearman_left_boot" type="MeshInstance3D" parent="." unique_id=954084373]
+[node name="spearman_left_boot" type="MeshInstance3D" parent="root" unique_id=954084373]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.18, 0.245, 0.1)
 mesh = SubResource("ArrayMesh_q0k2b")
 
-[node name="spearman_right_boot" type="MeshInstance3D" parent="." unique_id=425772505]
+[node name="spearman_right_boot" type="MeshInstance3D" parent="root" unique_id=425772505]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.18, 0.245, 0.1)
 mesh = SubResource("ArrayMesh_f7e5m")
 
-[node name="spearman_cloth_tunic" type="MeshInstance3D" parent="." unique_id=542883725]
+[node name="spearman_cloth_tunic" type="MeshInstance3D" parent="root" unique_id=542883725]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.12, 0)
-material_override = SubResource("StandardMaterial3D_woe7l")
+material_override = SubResource("StandardMaterial3D_og360")
 mesh = SubResource("ArrayMesh_4u7kn")
 metadata/needs_faction_color = true
 
-[node name="spearman_belt" type="MeshInstance3D" parent="." unique_id=671572470]
+[node name="spearman_belt" type="MeshInstance3D" parent="root" unique_id=671572470]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.06, 0.01)
 mesh = SubResource("ArrayMesh_kpso5")
 
-[node name="spearman_front_tabard_panel" type="MeshInstance3D" parent="." unique_id=365967355]
+[node name="spearman_front_tabard_panel" type="MeshInstance3D" parent="root" unique_id=365967355]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.08, 0.292)
-material_override = SubResource("StandardMaterial3D_g08ft")
+material_override = SubResource("StandardMaterial3D_8qdc0")
 mesh = SubResource("ArrayMesh_oo1b3")
 metadata/needs_faction_color = true
 
-[node name="spearman_back_tabard_panel" type="MeshInstance3D" parent="." unique_id=1915694029]
+[node name="spearman_back_tabard_panel" type="MeshInstance3D" parent="root" unique_id=1915694029]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.08, -0.245)
-material_override = SubResource("StandardMaterial3D_yr7ac")
+material_override = SubResource("StandardMaterial3D_rygoh")
 mesh = SubResource("ArrayMesh_i64fa")
 metadata/needs_faction_color = true
 
-[node name="spearman_silver_chestplate" type="MeshInstance3D" parent="." unique_id=1385084030]
+[node name="spearman_silver_chestplate" type="MeshInstance3D" parent="root" unique_id=1385084030]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.31, 0.232)
 mesh = SubResource("ArrayMesh_3jaas")
 
-[node name="spearman_left_pauldron" type="MeshInstance3D" parent="." unique_id=794277941]
+[node name="spearman_left_pauldron" type="MeshInstance3D" parent="root" unique_id=794277941]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.34, 1.44, 0.03)
 mesh = SubResource("ArrayMesh_2fpgx")
 
-[node name="spearman_right_pauldron" type="MeshInstance3D" parent="." unique_id=2096821065]
+[node name="spearman_right_pauldron" type="MeshInstance3D" parent="root" unique_id=2096821065]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.34, 1.44, 0.03)
 mesh = SubResource("ArrayMesh_nr7k1")
 
-[node name="spearman_head_skin" type="MeshInstance3D" parent="." unique_id=1712361568]
+[node name="spearman_head_skin" type="MeshInstance3D" parent="root" unique_id=1712361568]
 transform = Transform3D(1, 0, 0, 0, 1.08, 0, 0, 0, 0.95, 0, 1.82, 0.02)
 mesh = SubResource("ArrayMesh_4tpvk")
 
-[node name="spearman_helmet_dome" type="MeshInstance3D" parent="." unique_id=699466380]
+[node name="spearman_helmet_dome" type="MeshInstance3D" parent="root" unique_id=699466380]
 transform = Transform3D(1.08, 0, 0, 0, 0.62, 0, 0, 0, 1.02, 0, 1.885, 0.02)
 mesh = SubResource("ArrayMesh_w0tfj")
 
-[node name="spearman_helmet_brow_band" type="MeshInstance3D" parent="." unique_id=253335627]
+[node name="spearman_helmet_brow_band" type="MeshInstance3D" parent="root" unique_id=253335627]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.855, 0.02)
 mesh = SubResource("ArrayMesh_xujxt")
 
-[node name="spearman_helmet_point" type="MeshInstance3D" parent="." unique_id=1786782386]
+[node name="spearman_helmet_point" type="MeshInstance3D" parent="root" unique_id=1786782386]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.095, 0.02)
 mesh = SubResource("ArrayMesh_kur7e")
 
-[node name="spearman_nose_guard" type="MeshInstance3D" parent="." unique_id=498623671]
+[node name="spearman_nose_guard" type="MeshInstance3D" parent="root" unique_id=498623671]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.825, 0.21)
 mesh = SubResource("ArrayMesh_67x1y")
 
-[node name="right_arm_holding_spear" type="MeshInstance3D" parent="." unique_id=773574210]
+[node name="right_arm_holding_spear" type="MeshInstance3D" parent="root" unique_id=773574210]
 transform = Transform3D(0.872506, 0.45067596, -0.1887444, -1.4901161e-08, -0.38629377, -0.9223758, -0.48860338, 0.80477846, -0.33704364, 0.38, 1.3299999, 0.155)
 mesh = SubResource("ArrayMesh_r4ati")
 
-[node name="spear_grip_hand" type="MeshInstance3D" parent="." unique_id=300220299]
+[node name="spear_grip_hand" type="MeshInstance3D" parent="root" unique_id=300220299]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 1.27, 0.28)
 mesh = SubResource("ArrayMesh_m4j72")
 
-[node name="tall_spear_wood_shaft" type="MeshInstance3D" parent="." unique_id=789619158]
+[node name="tall_spear_wood_shaft" type="MeshInstance3D" parent="root" unique_id=789619158]
 transform = Transform3D(0.44721353, -0.062026285, -0.89227396, -2.4400651e-07, 0.99759257, -0.06934761, 0.89442724, 0.031013409, 0.44613683, 0.41, 1.335, 0.34)
 mesh = SubResource("ArrayMesh_rhfj7")
 
-[node name="tall_spear_metal_tip" type="MeshInstance3D" parent="." unique_id=281874904]
+[node name="tall_spear_metal_tip" type="MeshInstance3D" parent="root" unique_id=281874904]
 transform = Transform3D(0.44721347, -0.06202697, -0.89227396, 5.494803e-07, 0.9975925, -0.069347985, 0.89442724, 0.031012865, 0.44613683, 0.34007576, 2.4596148, 0.37496212)
 mesh = SubResource("ArrayMesh_q4ti5")
 
-[node name="tall_spear_small_binding" type="MeshInstance3D" parent="." unique_id=763026439]
+[node name="tall_spear_small_binding" type="MeshInstance3D" parent="root" unique_id=763026439]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35341144, 2.2451324, 0.36829427)
 mesh = SubResource("ArrayMesh_oe1ie")
 
-[node name="left_arm_small_shield" type="MeshInstance3D" parent="." unique_id=842506404]
+[node name="left_arm_small_shield" type="MeshInstance3D" parent="root" unique_id=842506404]
 transform = Transform3D(0.80188286, -0.49857765, 0.3292479, 1.4901161e-08, -0.5510597, -0.83446574, 0.59748125, 0.6691438, -0.44188535, -0.405, 1.265, 0.1625)
 mesh = SubResource("ArrayMesh_m8vep")
 
-[node name="small_green_round_shield" type="MeshInstance3D" parent="." unique_id=1613383124]
+[node name="small_green_round_shield" type="MeshInstance3D" parent="root" unique_id=1613383124]
 transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, -0.56, 1.15, 0.355)
-material_override = SubResource("StandardMaterial3D_0oqrv")
+material_override = SubResource("StandardMaterial3D_tewaf")
 mesh = SubResource("ArrayMesh_mh0fw")
 metadata/needs_faction_color = true
 
-[node name="small_green_round_shield_metal_rim" type="MeshInstance3D" parent="." unique_id=1788563827]
+[node name="small_green_round_shield_metal_rim" type="MeshInstance3D" parent="root" unique_id=1788563827]
 transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, -0.56, 1.15, 0.398)
 mesh = SubResource("ArrayMesh_ok6lr")
 
-[node name="small_green_round_shield_wood_face" type="MeshInstance3D" parent="." unique_id=388114711]
+[node name="small_green_round_shield_wood_face" type="MeshInstance3D" parent="root" unique_id=388114711]
 transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, -0.56, 1.15, 0.415)
-material_override = SubResource("StandardMaterial3D_opk0a")
+material_override = SubResource("StandardMaterial3D_vc668")
 mesh = SubResource("ArrayMesh_sbsi0")
 metadata/needs_faction_color = true
 
-[node name="small_green_round_shield_center_boss" type="MeshInstance3D" parent="." unique_id=2007626929]
+[node name="small_green_round_shield_center_boss" type="MeshInstance3D" parent="root" unique_id=2007626929]
 transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, -0.56, 1.15, 0.43)
 mesh = SubResource("ArrayMesh_xerw1")
 
-[node name="small_green_round_shield_vertical_band" type="MeshInstance3D" parent="." unique_id=1581814293]
+[node name="small_green_round_shield_vertical_band" type="MeshInstance3D" parent="root" unique_id=1581814293]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.56, 1.15, 0.443)
 mesh = SubResource("ArrayMesh_up4ui")
 
-[node name="small_green_round_shield_horizontal_band" type="MeshInstance3D" parent="." unique_id=555301922]
+[node name="small_green_round_shield_horizontal_band" type="MeshInstance3D" parent="root" unique_id=555301922]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.56, 1.15, 0.447)
 mesh = SubResource("ArrayMesh_fvb54")
 
-[node name="green_tabard_tail" type="MeshInstance3D" parent="." unique_id=1917041685]
+[node name="green_tabard_tail" type="MeshInstance3D" parent="root" unique_id=1917041685]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0.292)
-material_override = SubResource("StandardMaterial3D_k74kt")
+material_override = SubResource("StandardMaterial3D_3s22t")
 mesh = SubResource("ArrayMesh_15yo8")
 metadata/needs_faction_color = true

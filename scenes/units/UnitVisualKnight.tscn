@@ -914,8 +914,7 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_ac0l2")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_paxyd"]
-shading_mode = 0
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_h8s6y"]
 albedo_color = Color(0.25, 0.55, 1, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2hcoa"]
@@ -1069,8 +1068,7 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_b6fx3")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_g0duh"]
-shading_mode = 0
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ib3ud"]
 albedo_color = Color(0.25, 0.55, 1, 1)
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_erxwy"]
@@ -1146,8 +1144,7 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_dpnty")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1mmhb"]
-shading_mode = 0
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fcgdl"]
 albedo_color = Color(0.25, 0.55, 1, 1)
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_2gh3f"]
@@ -1530,8 +1527,7 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_drvn3")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ybv38"]
-shading_mode = 0
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ya1nd"]
 albedo_color = Color(0.25, 0.55, 1, 1)
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_vd6fv"]
@@ -1671,198 +1667,201 @@ shadow_mesh = SubResource("ArrayMesh_3b0ey")
 [node name="UnitVisualKnight" type="Node3D" unique_id=177005726]
 script = ExtResource("1_script")
 
-[node name="round_base_body_003" type="MeshInstance3D" parent="." unique_id=1378350085]
+[node name="root" type="Node3D" parent="." unique_id=785845018]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
+
+[node name="round_base_body_003" type="MeshInstance3D" parent="root" unique_id=1378350085]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.09, 0)
 mesh = SubResource("ArrayMesh_ib3ud")
 
-[node name="round_base_top_rough_003" type="MeshInstance3D" parent="." unique_id=845493581]
+[node name="round_base_top_rough_003" type="MeshInstance3D" parent="root" unique_id=845493581]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.195, 0)
 mesh = SubResource("ArrayMesh_ya1nd")
 
-[node name="round_base_rim_003" type="MeshInstance3D" parent="." unique_id=1044074389]
+[node name="round_base_rim_003" type="MeshInstance3D" parent="root" unique_id=1044074389]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.18, 0)
 mesh = SubResource("ArrayMesh_jqhyh")
 
-[node name="base_pebble_1" type="MeshInstance3D" parent="." unique_id=461218931]
+[node name="base_pebble_1" type="MeshInstance3D" parent="root" unique_id=461218931]
 transform = Transform3D(1.3, 0, 0, 0, 0.35, 0, 0, 0, 0.9, 0.567, 0.225, 0)
 mesh = SubResource("ArrayMesh_ubuai")
 
-[node name="base_pebble_2" type="MeshInstance3D" parent="." unique_id=42198646]
+[node name="base_pebble_2" type="MeshInstance3D" parent="root" unique_id=42198646]
 transform = Transform3D(0.4017221, 0, 0.8559509, 0, 0.35, 0, -1.2363734, 0, 0.2781153, 0.17521264, 0.225, -0.53924906)
 mesh = SubResource("ArrayMesh_ef63i")
 
-[node name="base_pebble_3" type="MeshInstance3D" parent="." unique_id=1668736971]
+[node name="base_pebble_3" type="MeshInstance3D" parent="root" unique_id=1668736971]
 transform = Transform3D(-1.0517222, 0, 0.52900666, 0, 0.35, 0, -0.7641207, 0, -0.7281153, -0.45871264, 0.225, -0.33327425)
 mesh = SubResource("ArrayMesh_pbykh")
 
-[node name="base_pebble_4" type="MeshInstance3D" parent="." unique_id=1835110058]
+[node name="base_pebble_4" type="MeshInstance3D" parent="root" unique_id=1835110058]
 transform = Transform3D(-1.0517219, 0, -0.52900684, 0, 0.35, 0, 0.764121, 0, -0.7281152, -0.45871264, 0.225, 0.33327425)
 mesh = SubResource("ArrayMesh_wunrx")
 
-[node name="base_pebble_5" type="MeshInstance3D" parent="." unique_id=665214938]
+[node name="base_pebble_5" type="MeshInstance3D" parent="root" unique_id=665214938]
 transform = Transform3D(0.40172213, 0, -0.8559509, 0, 0.35, 0, 1.2363735, 0, 0.2781153, 0.17521264, 0.225, 0.53924906)
 mesh = SubResource("ArrayMesh_xickf")
 
-[node name="horse_body" type="MeshInstance3D" parent="." unique_id=561135708]
+[node name="horse_body" type="MeshInstance3D" parent="root" unique_id=561135708]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.88, 0)
 mesh = SubResource("ArrayMesh_qhgn3")
 
-[node name="horse_chest" type="MeshInstance3D" parent="." unique_id=365853164]
+[node name="horse_chest" type="MeshInstance3D" parent="root" unique_id=365853164]
 transform = Transform3D(1.25, 0, 0, 0, 1.08, 0, 0, 0, 0.92, 0, 0.91, 0.24)
 mesh = SubResource("ArrayMesh_rglop")
 
-[node name="horse_rump" type="MeshInstance3D" parent="." unique_id=1587803149]
+[node name="horse_rump" type="MeshInstance3D" parent="root" unique_id=1587803149]
 transform = Transform3D(1.2, 0, 0, 0, 1.05, 0, 0, 0, 0.92, 0, 0.91, -0.25)
 mesh = SubResource("ArrayMesh_b47xy")
 
-[node name="horse_neck" type="MeshInstance3D" parent="." unique_id=1540958941]
+[node name="horse_neck" type="MeshInstance3D" parent="root" unique_id=1540958941]
 transform = Transform3D(1, 0, 0, 0, 0.7808689, -0.624695, 0, 0.624695, 0.7808689, 0, 1.155, 0.35)
 mesh = SubResource("ArrayMesh_1j3ij")
 
-[node name="horse_head" type="MeshInstance3D" parent="." unique_id=1844649196]
+[node name="horse_head" type="MeshInstance3D" parent="root" unique_id=1844649196]
 transform = Transform3D(0.82, 0, 0, 0, 0.95, 0, 0, 0, 1.28, 0, 1.36, 0.59)
 mesh = SubResource("ArrayMesh_n87ku")
 
-[node name="horse_muzzle" type="MeshInstance3D" parent="." unique_id=311424359]
+[node name="horse_muzzle" type="MeshInstance3D" parent="root" unique_id=311424359]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 0.74)
 mesh = SubResource("ArrayMesh_clwft")
 
-[node name="horse_mane" type="MeshInstance3D" parent="." unique_id=580968908]
+[node name="horse_mane" type="MeshInstance3D" parent="root" unique_id=580968908]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.19, 0.32)
 mesh = SubResource("ArrayMesh_p6o8a")
 
-[node name="horse_left_ear" type="MeshInstance3D" parent="." unique_id=1759681224]
+[node name="horse_left_ear" type="MeshInstance3D" parent="root" unique_id=1759681224]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.075, 1.54, 0.58)
 mesh = SubResource("ArrayMesh_iqk2t")
 
-[node name="horse_right_ear" type="MeshInstance3D" parent="." unique_id=214085835]
+[node name="horse_right_ear" type="MeshInstance3D" parent="root" unique_id=214085835]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.075, 1.54, 0.58)
 mesh = SubResource("ArrayMesh_xbgvb")
 
-[node name="horse_leg_0_0" type="MeshInstance3D" parent="." unique_id=97806823]
+[node name="horse_leg_0_0" type="MeshInstance3D" parent="root" unique_id=97806823]
 transform = Transform3D(0, 0.08963774, 0.9959744, -1.7508864e-07, 0.9959744, -0.08963774, -1, -1.7508864e-07, 0, -0.3102, 0.5, 0.23)
 mesh = SubResource("ArrayMesh_a2iwe")
 
-[node name="horse_hoof_0_0" type="MeshInstance3D" parent="." unique_id=1280229968]
+[node name="horse_hoof_0_0" type="MeshInstance3D" parent="root" unique_id=1280229968]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.33, 0.245, 0.25)
 mesh = SubResource("ArrayMesh_mkvn4")
 
-[node name="horse_leg_0_1" type="MeshInstance3D" parent="." unique_id=823139831]
+[node name="horse_leg_0_1" type="MeshInstance3D" parent="root" unique_id=823139831]
 transform = Transform3D(0, 0.08963774, 0.9959744, -1.7508864e-07, 0.9959744, -0.08963774, -1, -1.7508864e-07, 0, -0.3102, 0.5, -0.23)
 mesh = SubResource("ArrayMesh_w7hao")
 
-[node name="horse_hoof_0_1" type="MeshInstance3D" parent="." unique_id=501871011]
+[node name="horse_hoof_0_1" type="MeshInstance3D" parent="root" unique_id=501871011]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.33, 0.245, -0.21)
 mesh = SubResource("ArrayMesh_esn3m")
 
-[node name="horse_leg_1_0" type="MeshInstance3D" parent="." unique_id=224743428]
+[node name="horse_leg_1_0" type="MeshInstance3D" parent="root" unique_id=224743428]
 transform = Transform3D(0, -0.08963774, -0.9959744, 1.7508864e-07, 0.9959744, -0.08963774, 1, -1.7508864e-07, 0, 0.3102, 0.5, 0.23)
 mesh = SubResource("ArrayMesh_hoo30")
 
-[node name="horse_hoof_1_0" type="MeshInstance3D" parent="." unique_id=1455589439]
+[node name="horse_hoof_1_0" type="MeshInstance3D" parent="root" unique_id=1455589439]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.33, 0.245, 0.25)
 mesh = SubResource("ArrayMesh_axfky")
 
-[node name="horse_leg_1_1" type="MeshInstance3D" parent="." unique_id=1329084326]
+[node name="horse_leg_1_1" type="MeshInstance3D" parent="root" unique_id=1329084326]
 transform = Transform3D(0, -0.08963774, -0.9959744, 1.7508864e-07, 0.9959744, -0.08963774, 1, -1.7508864e-07, 0, 0.3102, 0.5, -0.23)
 mesh = SubResource("ArrayMesh_utu4i")
 
-[node name="horse_hoof_1_1" type="MeshInstance3D" parent="." unique_id=1148291785]
+[node name="horse_hoof_1_1" type="MeshInstance3D" parent="root" unique_id=1148291785]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.33, 0.245, -0.21)
 mesh = SubResource("ArrayMesh_hexi8")
 
-[node name="horse_tail" type="MeshInstance3D" parent="." unique_id=642911834]
+[node name="horse_tail" type="MeshInstance3D" parent="root" unique_id=642911834]
 transform = Transform3D(-0.9999999, -1.1035311e-07, -4.1805173e-08, 1.1035311e-07, -0.7489964, -0.66257393, 4.1805173e-08, -0.66257393, 0.7489965, 0, 0.85, -0.565)
 mesh = SubResource("ArrayMesh_f5afc")
 
-[node name="red_saddle_cloth" type="MeshInstance3D" parent="." unique_id=2024209048]
+[node name="red_saddle_cloth" type="MeshInstance3D" parent="root" unique_id=2024209048]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.13, 0.01)
-material_override = SubResource("StandardMaterial3D_paxyd")
+material_override = SubResource("StandardMaterial3D_h8s6y")
 mesh = SubResource("ArrayMesh_da2tu")
 metadata/needs_faction_color = true
 
-[node name="leather_saddle" type="MeshInstance3D" parent="." unique_id=1723572320]
+[node name="leather_saddle" type="MeshInstance3D" parent="root" unique_id=1723572320]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.21, 0.02)
 mesh = SubResource("ArrayMesh_4jost")
 
-[node name="rider_left_leg" type="MeshInstance3D" parent="." unique_id=1228256704]
+[node name="rider_left_leg" type="MeshInstance3D" parent="root" unique_id=1228256704]
 transform = Transform3D(-1.1920929e-07, -0.39760745, 0.9175557, 0, -0.9175557, -0.39760745, 1, -2.9802322e-08, 0, -0.225, 0.97, 0.02)
 mesh = SubResource("ArrayMesh_yrd07")
 
-[node name="rider_right_leg" type="MeshInstance3D" parent="." unique_id=156066510]
-transform = Transform3D(-1.1920929e-07, 0.39760745, -0.9175557, 0, -0.9175557, -0.39760745, -1, -2.9802322e-08, 0, 0.225, 0.97, 0.02)
+[node name="rider_right_leg" type="MeshInstance3D" parent="root" unique_id=156066510]
+transform = Transform3D(-1.1920929e-07, 0.39760745, -0.9175557, 0, -0.9175557, -0.39760745, -1, -2.9802326e-08, 0, 0.225, 0.97, 0.02)
 mesh = SubResource("ArrayMesh_3ju37")
 
-[node name="rider_red_surcoat" type="MeshInstance3D" parent="." unique_id=2011018319]
+[node name="rider_red_surcoat" type="MeshInstance3D" parent="root" unique_id=2011018319]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.43, 0.03)
-material_override = SubResource("StandardMaterial3D_g0duh")
+material_override = SubResource("StandardMaterial3D_ib3ud")
 mesh = SubResource("ArrayMesh_suf3y")
 metadata/needs_faction_color = true
 
-[node name="rider_silver_breastplate" type="MeshInstance3D" parent="." unique_id=926737457]
+[node name="rider_silver_breastplate" type="MeshInstance3D" parent="root" unique_id=926737457]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.49, 0.225)
 mesh = SubResource("ArrayMesh_m3lyf")
 
-[node name="rider_red_cape" type="MeshInstance3D" parent="." unique_id=213850645]
+[node name="rider_red_cape" type="MeshInstance3D" parent="root" unique_id=213850645]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.36, -0.205)
-material_override = SubResource("StandardMaterial3D_1mmhb")
+material_override = SubResource("StandardMaterial3D_fcgdl")
 mesh = SubResource("ArrayMesh_8oa71")
 metadata/needs_faction_color = true
 
-[node name="rider_head_skin" type="MeshInstance3D" parent="." unique_id=336110658]
+[node name="rider_head_skin" type="MeshInstance3D" parent="root" unique_id=336110658]
 transform = Transform3D(1, 0, 0, 0, 1.08, 0, 0, 0, 0.95, 0, 1.83, 0.03)
 mesh = SubResource("ArrayMesh_boe8r")
 
-[node name="rider_helmet_dome" type="MeshInstance3D" parent="." unique_id=1999657482]
+[node name="rider_helmet_dome" type="MeshInstance3D" parent="root" unique_id=1999657482]
 transform = Transform3D(1.08, 0, 0, 0, 0.62, 0, 0, 0, 1.02, 0, 1.895, 0.03)
 mesh = SubResource("ArrayMesh_g1ba7")
 
-[node name="rider_helmet_brow_band" type="MeshInstance3D" parent="." unique_id=2074154709]
+[node name="rider_helmet_brow_band" type="MeshInstance3D" parent="root" unique_id=2074154709]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.865, 0.03)
 mesh = SubResource("ArrayMesh_cfku4")
 
-[node name="rider_helmet_point" type="MeshInstance3D" parent="." unique_id=331898578]
+[node name="rider_helmet_point" type="MeshInstance3D" parent="root" unique_id=331898578]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.105, 0.03)
 mesh = SubResource("ArrayMesh_c3fjd")
 
-[node name="rider_nose_guard" type="MeshInstance3D" parent="." unique_id=278945836]
+[node name="rider_nose_guard" type="MeshInstance3D" parent="root" unique_id=278945836]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.835, 0.22)
 mesh = SubResource("ArrayMesh_dbl5q")
 
-[node name="rider_lance_arm" type="MeshInstance3D" parent="." unique_id=1633924739]
+[node name="rider_lance_arm" type="MeshInstance3D" parent="root" unique_id=1633924739]
 transform = Transform3D(0.83761054, 0.47198766, -0.27502042, 1.3411045e-07, -0.5034536, -0.8640224, -0.54626787, 0.72371423, -0.4216981, 0.365, 1.4200001, 0.155)
 mesh = SubResource("ArrayMesh_0owy7")
 
-[node name="rider_lance_hand" type="MeshInstance3D" parent="." unique_id=2091201637]
+[node name="rider_lance_hand" type="MeshInstance3D" parent="root" unique_id=2091201637]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.44, 1.34, 0.27)
 mesh = SubResource("ArrayMesh_epngq")
 
-[node name="cavalry_lance_wood_shaft" type="MeshInstance3D" parent="." unique_id=684976268]
+[node name="cavalry_lance_wood_shaft" type="MeshInstance3D" parent="root" unique_id=684976268]
 transform = Transform3D(0.8320502, -0.27388912, -0.48236632, -2.9802322e-08, 0.8695979, -0.4937605, 0.5547004, 0.4108335, 0.7235491, 0.4, 1.5150001, 0.48)
 mesh = SubResource("ArrayMesh_i21ob")
 
-[node name="cavalry_lance_metal_tip" type="MeshInstance3D" parent="." unique_id=853892399]
+[node name="cavalry_lance_metal_tip" type="MeshInstance3D" parent="root" unique_id=853892399]
 transform = Transform3D(0.8320502, -0.27388936, -0.4823661, 5.9604645e-08, 0.86959773, -0.49376085, 0.5547003, 0.4108338, 0.723549, 0.15617774, 2.2891357, 0.84573334)
 mesh = SubResource("ArrayMesh_dgt3c")
 
-[node name="cavalry_lance_small_binding" type="MeshInstance3D" parent="." unique_id=1747435297]
+[node name="cavalry_lance_small_binding" type="MeshInstance3D" parent="root" unique_id=1747435297]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2150639, 2.1021721, 0.75740415)
 mesh = SubResource("ArrayMesh_4ji4a")
 
-[node name="lance_red_pennant" type="MeshInstance3D" parent="." unique_id=1242625883]
+[node name="lance_red_pennant" type="MeshInstance3D" parent="root" unique_id=1242625883]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.31, 1.88, 0.64)
-material_override = SubResource("StandardMaterial3D_ybv38")
+material_override = SubResource("StandardMaterial3D_ya1nd")
 mesh = SubResource("ArrayMesh_1sn66")
 metadata/needs_faction_color = true
 
-[node name="rider_rein_arm" type="MeshInstance3D" parent="." unique_id=1128863592]
+[node name="rider_rein_arm" type="MeshInstance3D" parent="root" unique_id=1128863592]
 transform = Transform3D(0.9647638, 0.23284516, -0.122531265, 2.2351742e-08, -0.4656906, -0.8849477, -0.26311743, 0.85376555, -0.44928145, -0.22500001, 1.39, 0.19500001)
 mesh = SubResource("ArrayMesh_j175e")
 
-[node name="left_rein" type="MeshInstance3D" parent="." unique_id=1986039095]
+[node name="left_rein" type="MeshInstance3D" parent="root" unique_id=1986039095]
 transform = Transform3D(0.9333456, 0.34503275, 0.09908776, 4.4703484e-08, 0.27602643, -0.96115005, -0.3589791, 0.8970852, 0.25762808, -0.11, 1.3299999, 0.49)
 mesh = SubResource("ArrayMesh_taiug")
 
-[node name="right_rein" type="MeshInstance3D" parent="." unique_id=710266972]
+[node name="right_rein" type="MeshInstance3D" parent="root" unique_id=710266972]
 transform = Transform3D(0.9333456, -0.34503275, -0.09908776, -4.4703484e-08, 0.27602643, -0.96115005, 0.3589791, 0.8970852, 0.25762808, 0.11, 1.3299999, 0.49)
 mesh = SubResource("ArrayMesh_wm3hf")

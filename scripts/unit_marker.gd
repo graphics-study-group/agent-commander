@@ -59,3 +59,14 @@ func _setup_health_bar_materials() -> void:
 		_hp_fg.material_override = _hp_fg_mat
 	if is_instance_valid(_hp_bg):
 		_hp_bg.material_override = _hp_bg_mat
+
+
+func face_towards(target_pos: Vector3) -> void:
+	if not is_instance_valid(_visual):
+		return
+	var from := _visual.global_position
+	var flat_target := Vector3(target_pos.x, from.y, target_pos.z)
+	if from.distance_squared_to(flat_target) < 0.000001:
+		return
+	# Rotate only the visual mesh, keep HP/name anchors unrotated.
+	_visual.look_at(flat_target, Vector3.UP)

@@ -667,6 +667,20 @@ func _unit_world_pos(col: int, row: int) -> Vector3:
 	return pos
 
 
+func _face_marker_towards(marker_root: Node3D, target_pos: Vector3) -> void:
+	if not is_instance_valid(marker_root):
+		return
+	if marker_root is UnitMarker:
+		(marker_root as UnitMarker).face_towards(target_pos)
+		return
+	var from := marker_root.global_position
+	var flat_target := Vector3(target_pos.x, from.y, target_pos.z)
+	if from.distance_squared_to(flat_target) < 0.000001:
+		return
+	# Keep rotation on horizontal plane only.
+	marker_root.look_at(flat_target, Vector3.UP)
+
+
 func update_unit_org(unit_name: String, org: float) -> void:
 	var d: Dictionary = _units.get(unit_name, {})
 	if d.is_empty():
@@ -1114,6 +1128,7 @@ func _execute_next_move(unit_name: String) -> void:
 	var target_pos  := _unit_world_pos(nc, nr)
 
 	var marker_root: Node3D = d["marker_root"]
+	_face_marker_towards(marker_root, target_pos)
 	var tween := create_tween()
 	d["current_tween"] = tween
 	tween.tween_property(marker_root, "position", target_pos, travel_time)
