@@ -7,7 +7,7 @@
 - 引擎：Godot 4.6（`project.godot` 中配置）
 - 默认主菜单：`res://scenes/main_menu.tscn`
 - 地图编辑器场景：`res://scenes/map_editor.tscn`
-- 游戏主场景（读取固定地图）：`res://scenes/game_main.tscn`
+- 游戏主场景：`res://scenes/game_main.tscn`（优先读取 `AppState.selected_map_path`，为空时回退默认地图）
 - 渲染方式：Mobile Renderer
 
 
@@ -30,8 +30,9 @@
 ## 地图编辑与加载
 
 - 地图数据类型：`MapData`（`res://scripts/map_data.gd`）
-- 默认地图文件：`res://maps/default_map.tres`
-- 编辑器另存一份到：`user://maps/default_map.tres`
+- 默认回退地图文件：`res://maps/default_map.tres`
+- 主菜单预制地图（导出兜底）：`res://maps/对拿破仑的包围网.tres`（通过 `preload` 强制打包）
+- 编辑器保存目录：`user://maps/*.tres`
 - 地块架构：`TileBase` 基类场景 + 派生地块场景（Plain / Forest / Mountain / Water / City）
 
 ### 地块系统
@@ -49,7 +50,7 @@
 
 1. 打开并运行 `res://scenes/map_editor.tscn`。
 2. 点击 **Generate Random** 随机生成地图。
-3. 点击 **Save Map** 保存到 `res://maps/default_map.tres`，并尝试导出到 `user://maps/default_map.tres`。
+3. 点击 **Save Map** 保存到 `user://maps/<地图名>.tres`。
 4. **地形绘制**：左侧面板选择地块类型后，左键点击/拖拽绘制。
 5. **道路绘制**：选择道路方向，在相邻地块之间绘制或清除道路连接。
 6. **地点命名**：为地图格设置地名，支持 AI 自动批量命名（调用 DeepSeek API）；地名以 3D 标签显示在地图上。
@@ -60,8 +61,14 @@
 ### 游戏流程
 
 1. 打开并运行 `res://scenes/game_main.tscn`。
-2. 场景启动时固定读取 `res://maps/default_map.tres`。
-3. 若读取失败，会回退为随机地图并打印 warning。
+2. 场景启动时优先读取 `AppState.selected_map_path`（由主菜单选图写入）。
+3. 若路径为空，回退为 `res://maps/default_map.tres`；若读取失败，回退为随机地图并打印 warning。
+
+### 主菜单地图来源（导出兼容）
+
+- 主菜单固定注入一张预制地图：`res://maps/对拿破仑的包围网.tres`（保证导出后可选）。
+- 同时保留对 `res://maps` 与 `user://maps` 的扫描，并自动去重。
+- 扫描失败时仍至少可选择预制地图进入游戏。
 
 ## AI Agent 系统
 
@@ -76,7 +83,7 @@
 
 ### 工具调用（Function Calling）
 
-- **UnitAgent / EnemyAgent**：`calculate_path`、`enqueue_action`（move / wait / modify_stats / emit_event）、`delete_queue_item`、`clear_exec_queue`、`name_point`、`rename_unit`、`split_unit`、`send_combat_order`
+- **UnitAgent / EnemyAgent**：`calculate_path`、`enqueue_action`（move_to / wait / modify_stats / emit_event）、`delete_queue_item`、`clear_exec_queue`、`name_point`、`rename_unit`、`split_unit`、`send_combat_order`
 - **BattleAgent**：`modify_unit_stats`、`end_battle`
 - **CommanderAgent**：`dispatch_to_unit`
 
@@ -134,11 +141,11 @@ Prompt 存放在 `prompts.json`（运行时优先加载 exe 同目录的同名�
 
 ## 补给与运输
 
-- 每 **150 游戏秒** 为一个补给日，每支蓝方部队消耗 1 点 SUPPLY。
-- 补给不足时，运输队从部队出生地出发，沿最短路径追踪当前部队位置。
-- 运输队每 **10 游戏秒** 前进 1 格，到达目标格后补充 +1 SUPPLY（上限 7）。
-- 红方单位可拦截运输队（同格接触），补给转交拦截方。
-- 地图上运输队以彩色小方块标记显示。
+- 每 **150 游戏秒** 为一个补给日，双方单位各消耗 1 点 SUPPLY。
+- 补给队从单位出生地出发，持续重算到目标单位的最短路径并逐格前进。
+- 每次前进一步的时长由地形/道路步进耗时决定（默认 10 秒，走道路更快）。
+- 同格时优先为同阵营目标（或友军）补给；若无友军则可被敌军截获并转移补给。
+- 地图上补给队使用 `SupplyMarker`，并渲染浅色三角补给路线。
 
 ## 指挥官界面
 
@@ -181,7 +188,7 @@ Prompt 存放在 `prompts.json`（运行时优先加载 exe 同目录的同名�
 |---|---|
 | `W / A / S / D` 或方向键 | 相机平移 |
 | 鼠标滚轮 | 相机缩放（范围 6–25） |
-| 鼠标左键拖拽 | 相机平移 |
+| 鼠标中键拖拽 | 相机平移 |
 | `Enter` | 发送指令 |
 | `Shift + Enter` | 指令输入框换行 |
 
