@@ -754,6 +754,67 @@ func _on_unit_collision(mover_name: String, resident_name: String) -> void:
 	_start_battle(mover_name, resident_name)
 
 
+func _combat_orbit_speed_for(unit: Unit) -> float:
+	if unit == null:
+		return 1.6
+	var atk_ratio := clampf(unit.ATK / 120.0, 0.0, 1.0)
+	return lerpf(1.45, 2.05, atk_ratio)
+
+
+func _interleave_battle_units(attacker_units: Array, defender_units: Array) -> Array:
+	var ordered: Array = []
+	var max_count := maxi(attacker_units.size(), defender_units.size())
+	for i in range(max_count):
+		if i < attacker_units.size():
+			var attacker_name := str(attacker_units[i])
+			if not ordered.has(attacker_name):
+				ordered.append(attacker_name)
+		if i < defender_units.size():
+			var defender_name := str(defender_units[i])
+			if not ordered.has(defender_name):
+				ordered.append(defender_name)
+	return ordered
+
+
+func _refresh_battle_combat_orbit(battle_id: String) -> void:
+	var b: Dictionary = _active_battles.get(battle_id, {})
+	if b.is_empty():
+		return
+	var attacker_units: Array = b.get("attacker_units", [])
+	var defender_units: Array = b.get("defender_units", [])
+	var hex_map := get_tree().get_first_node_in_group("hex_map")
+	if hex_map == null or not hex_map.has_method("set_unit_combat_orbit"):
+		return
+	var ordered_units := _interleave_battle_units(
+		attacker_units,
+		defender_units
+	)
+	if ordered_units.is_empty():
+		return
+	if hex_map.has_method("clear_battle_combat_orbits"):
+		hex_map.clear_battle_combat_orbits(battle_id)
+	var total := ordered_units.size()
+	var extra_units := maxi(total - 2, 0)
+	var radius := 0.52 + minf(0.18, float(extra_units) * 0.05)
+	var battle_col: int = b.get("col", 0)
+	var battle_row: int = b.get("row", 0)
+	for i in range(total):
+		var unit_name := str(ordered_units[i])
+		var unit := _find_any_unit(unit_name)
+		if unit == null:
+			continue
+		var is_attacker_side := unit_name in attacker_units
+		hex_map.set_unit_combat_orbit(unit_name, {
+			"battle_id": battle_id,
+			"center_col": battle_col,
+			"center_row": battle_row,
+			"radius": radius,
+			"phase": TAU * float(i) / float(total),
+			"angular_speed": _combat_orbit_speed_for(unit),
+			"clockwise": is_attacker_side
+		})
+
+
 func _start_battle(attacker_name: String, defender_name: String) -> void:
 	var hex_map := get_tree().get_first_node_in_group("hex_map")
 
@@ -795,6 +856,7 @@ func _start_battle(attacker_name: String, defender_name: String) -> void:
 	if hex_map != null and hex_map.has_method("freeze_unit"):
 		hex_map.freeze_unit(attacker_name)
 		hex_map.freeze_unit(defender_name)
+	_refresh_battle_combat_orbit(bid)
 
 	# Notify unit agents
 	var atk_agent := _find_any_agent(attacker_name)
@@ -861,6 +923,7 @@ func _reinforce_battle(battle_id: String, mover_name: String) -> void:
 	# Notify battle_agent
 	if ba.has_method("reinforce"):
 		ba.reinforce(mover_unit, is_attacker_side)
+	_refresh_battle_combat_orbit(battle_id)
 
 	# Notify enemy agent
 	if _enemy_agent != null:
@@ -912,6 +975,8 @@ func _on_combat_ended(battle_id: String, winner_side: String) -> void:
 	var hex_map := get_tree().get_first_node_in_group("hex_map")
 	var battle_col: int = b.get("col", 0)
 	var battle_row: int = b.get("row", 0)
+	if hex_map != null and hex_map.has_method("clear_battle_combat_orbits"):
+		hex_map.clear_battle_combat_orbits(battle_id)
 
 	for unit_name: String in all_units:
 		var is_winner := unit_name in winner_units

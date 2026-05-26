@@ -38,7 +38,7 @@ var enemy_unit_count: int = 2
 
 # unit_name → {unit, col, row, color, marker_root, move_queue, planned_route,
 #              active_step, current_tween, is_moving, speed_buff_kmh,
-#              speed_buff_hexes}
+#              speed_buff_hexes, combat_orbit}
 var _units: Dictionary = {}
 var _frozen_units: Dictionary = {}  # unit_name → true (blocks movement while in battle)
 var _unit_templates: Array = []     # Array[Dictionary] — initial unit configs saved with map
@@ -68,6 +68,7 @@ var _victory_city: Vector2i = Vector2i(-1, -1)
 var _victory_city_marker: Node3D = null
 
 var _convoy_markers: Dictionary = {}  # convoy_id → Node3D marker_root
+var _combat_orbit_time: float = 0.0
 
 
 func _ready() -> void:
@@ -81,7 +82,10 @@ func _ready() -> void:
 	call_deferred("_init_refs")
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_combat_orbit_time += delta
+	_update_combat_orbit_positions()
+
 	var camera := get_viewport().get_camera_3d()
 	if camera == null:
 		if _tooltip != null:
@@ -207,7 +211,8 @@ func register_unit(unit: Unit, color: Color = Color(0.25, 0.55, 1.0),
 		"current_tween": null,
 		"is_moving": false,
 		"speed_buff_kmh": 0.0,
-		"speed_buff_hexes": 0
+		"speed_buff_hexes": 0,
+		"combat_orbit": {}
 	}
 	update_unit_org(unit.unit_name, unit.ORG)
 	_refresh_unit_route(unit.unit_name)
@@ -694,7 +699,10 @@ func _recreate_all_markers() -> void:
 			d["planned_route"] = []
 		if not d.has("active_step"):
 			d["active_step"] = []
+		if not d.has("combat_orbit"):
+			d["combat_orbit"] = {}
 		update_unit_org(unit_name, (d["unit"] as Unit).ORG)
+		_update_marker_pos_for(unit_name)
 		_refresh_unit_route(unit_name)
 
 
@@ -705,6 +713,14 @@ func _update_marker_pos_for(unit_name: String) -> void:
 	var mr: Node3D = d.get("marker_root")
 	if not is_instance_valid(mr):
 		return
+	var orbit: Dictionary = d.get("combat_orbit", {})
+	if not orbit.is_empty():
+		var orbit_pos := _get_combat_orbit_world_pos(d, orbit)
+		mr.position = orbit_pos
+		var tangent := _get_combat_orbit_tangent(orbit)
+		if tangent.length_squared() > 0.000001:
+			_face_marker_towards(mr, orbit_pos + tangent)
+		return
 	mr.position = _unit_world_pos(int(d["col"]), int(d["row"]))
 
 
@@ -712,6 +728,52 @@ func _unit_world_pos(col: int, row: int) -> Vector3:
 	var pos := hex_to_world(col, row)
 	pos.y += 0.9
 	return pos
+
+
+func _get_combat_orbit_world_pos(d: Dictionary, orbit: Dictionary) -> Vector3:
+	var center_col := int(orbit.get("center_col", int(d.get("col", 0))))
+	var center_row := int(orbit.get("center_row", int(d.get("row", 0))))
+	var center_pos := _unit_world_pos(center_col, center_row)
+	var radius := float(orbit.get("radius", 0.0))
+	var phase := float(orbit.get("phase", 0.0))
+	var angular_speed := float(orbit.get("angular_speed", 0.0))
+	var direction := -1.0 if bool(orbit.get("clockwise", true)) else 1.0
+	var angle := phase + _combat_orbit_time * angular_speed * direction
+	center_pos.x += cos(angle) * radius
+	center_pos.z += sin(angle) * radius
+	return center_pos
+
+
+func _get_combat_orbit_tangent(orbit: Dictionary) -> Vector3:
+	var phase := float(orbit.get("phase", 0.0))
+	var angular_speed := float(orbit.get("angular_speed", 0.0))
+	if is_zero_approx(angular_speed):
+		return Vector3.ZERO
+	var direction := -1.0 if bool(orbit.get("clockwise", true)) else 1.0
+	var angle := phase + _combat_orbit_time * angular_speed * direction
+	var tangent := Vector3(-sin(angle) * direction, 0.0, cos(angle) * direction)
+	if tangent.length_squared() < 0.000001:
+		return Vector3.ZERO
+	return tangent.normalized()
+
+
+func _update_combat_orbit_positions() -> void:
+	for unit_name: String in _units:
+		var d: Dictionary = _units[unit_name]
+		var orbit: Dictionary = d.get("combat_orbit", {})
+		if orbit.is_empty():
+			continue
+		var tween: Tween = d.get("current_tween") as Tween
+		if is_instance_valid(tween) and tween.is_valid():
+			continue
+		var mr: Node3D = d.get("marker_root") as Node3D
+		if not is_instance_valid(mr):
+			continue
+		var orbit_pos := _get_combat_orbit_world_pos(d, orbit)
+		mr.position = orbit_pos
+		var tangent := _get_combat_orbit_tangent(orbit)
+		if tangent.length_squared() > 0.000001:
+			_face_marker_towards(mr, orbit_pos + tangent)
 
 
 func _face_marker_towards(marker_root: Node3D, target_pos: Vector3) -> void:
@@ -819,6 +881,34 @@ func set_unit_planned_route(unit_name: String, route: Array) -> void:
 		return
 	d["planned_route"] = route.duplicate(true)
 	_refresh_unit_route(unit_name)
+
+
+func set_unit_combat_orbit(unit_name: String, orbit_data: Dictionary) -> void:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
+		return
+	d["combat_orbit"] = orbit_data.duplicate(true)
+	_update_marker_pos_for(unit_name)
+
+
+func clear_unit_combat_orbit(unit_name: String) -> void:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
+		return
+	d["combat_orbit"] = {}
+	_update_marker_pos_for(unit_name)
+
+
+func clear_battle_combat_orbits(battle_id: String) -> void:
+	for unit_name: String in _units:
+		var d: Dictionary = _units[unit_name]
+		var orbit: Dictionary = d.get("combat_orbit", {})
+		if orbit.is_empty():
+			continue
+		if str(orbit.get("battle_id", "")) != battle_id:
+			continue
+		d["combat_orbit"] = {}
+		_update_marker_pos_for(unit_name)
 
 
 # ── Public movement API ───────────────────────────────────────────────────────
