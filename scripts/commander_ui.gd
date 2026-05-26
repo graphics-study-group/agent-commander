@@ -210,7 +210,7 @@ func _setup_agent() -> void:
 			if _pending_responses <= 0:
 				_send_btn.disabled = false
 				_status.text = ""
-			_append("\n[color=yellow][%s 电台]:[/color] %s" % [unit_name, _md_to_bbcode(narrative)])
+			_append("\n[color=yellow][%s 传令兵]:[/color] %s" % [unit_name, _md_to_bbcode(narrative)])
 		)
 
 		agent.stats_changed.connect(func(payload: Dictionary):
@@ -254,7 +254,7 @@ func _setup_agent() -> void:
 		if _pending_responses <= 0:
 			_send_btn.disabled = false
 			_status.text = ""
-		_append("\n[color=orange][传令兵]:[/color] %s" % _md_to_bbcode(narrative))
+		_append("\n[color=orange][参军]:[/color] %s" % _md_to_bbcode(narrative))
 	)
 
 	# ── Enemy units ──
@@ -300,7 +300,7 @@ func _setup_agent() -> void:
 	_enemy_agent.setup(_units_list, _enemy_entries, hex_map, _load_rules())
 
 	_enemy_agent.response_ready.connect(func(narrative: String):
-		_append("[color=red][敌方传令兵]:[/color] %s" % _md_to_bbcode(narrative))
+		_append("[color=red][敌方探子]:[/color] %s" % _md_to_bbcode(narrative))
 	)
 
 	_enemy_agent.debug_log.connect(func(msg: String):
@@ -346,7 +346,7 @@ func _unit_from_template(tmpls: Array, i: int, is_enemy: bool) -> Unit:
 
 
 func _make_player_unit(i: int) -> Unit:
-	var names := ["第1装甲旅", "第2机步旅", "第3步兵旅", "第4炮兵旅", "第5特战旅"]
+	var names := ["第一重骑队", "第二长矛队", "第三步卒队", "第四弓弩队", "第五斥候队"]
 	var u := Unit.new()
 	u.unit_name = names[i] if i < names.size() else ("第%d部队" % (i + 1))
 	u.ATK = 70.0; u.DEF = 60.0; u.ORG = 85.0; u.MORALE = 72.0
@@ -467,7 +467,7 @@ func do_split(source_unit: Unit, source_agent: Node, fragments: Array,
 			if _pending_responses <= 0:
 				_send_btn.disabled = false
 				_status.text = ""
-			_append("\n[color=yellow][%s 电台]:[/color] %s" % [unit_name_cap, _md_to_bbcode(narrative)])
+			_append("\n[color=yellow][%s 传令兵]:[/color] %s" % [unit_name_cap, _md_to_bbcode(narrative)])
 		)
 
 		fagent.stats_changed.connect(func(payload: Dictionary):
@@ -1126,7 +1126,7 @@ func _spawn_convoy(target_unit: Unit, is_player: bool, entry: Dictionary, hex_ma
 		"is_player":        is_player,
 		"col":              spawn_pos.x,
 		"row":              spawn_pos.y,
-		"step_elapsed":     0.0,
+		"step_in_progress": false,
 		"quantity":         target_unit.STR
 	})
 	if hex_map.has_method("add_convoy_marker"):
@@ -1134,7 +1134,7 @@ func _spawn_convoy(target_unit: Unit, is_player: bool, entry: Dictionary, hex_ma
 		hex_map.add_convoy_marker(str(convoy_id), spawn_pos.x, spawn_pos.y, convoy_color)
 
 
-func _advance_convoys(game_delta: float) -> void:
+func _advance_convoys(_game_delta: float) -> void:
 	if _convoys.is_empty():
 		return
 	var hex_map := get_tree().get_first_node_in_group("hex_map")
@@ -1144,100 +1144,98 @@ func _advance_convoys(game_delta: float) -> void:
 	var to_remove: Array = []
 
 	for convoy: Dictionary in _convoys:
-		# Check if any enemy is already on this convoy hex (unit walked onto it)
-		var cur_col_c := int(convoy["col"])
-		var cur_row_c := int(convoy["row"])
-		var is_player_c: bool = convoy["is_player"]
-		var interceptors_c := _enemy_entries if is_player_c else _units_list
-		var instant_intercepted := false
-		for ientry: Dictionary in interceptors_c:
-			var iu: Unit = ientry.get("unit") as Unit
-			if iu == null: continue
-			var ipos: Vector2i = hex_map.get_unit_pos(iu.unit_name)
-			if ipos.x == cur_col_c and ipos.y == cur_row_c:
-				var qty_c := float(convoy.get("quantity", iu.STR))
-				iu.SUPPLY = minf(7.0, iu.SUPPLY + qty_c / maxf(1.0, iu.STR))
-				to_remove.append(convoy)
-				instant_intercepted = true
-				break
-		if instant_intercepted:
+		if bool(convoy.get("step_in_progress", false)):
 			continue
-		convoy["step_elapsed"] = float(convoy.get("step_elapsed", 0.0)) + game_delta
-		if float(convoy["step_elapsed"]) < 10.0:
+
+		var col := int(convoy["col"])
+		var row := int(convoy["row"])
+		var qty := float(convoy.get("quantity", 0.0))
+
+		# Deliver to same-faction (target first, then any friendly), or let enemy intercept
+		if _try_consume_convoy_at(convoy, col, row, hex_map, qty):
+			to_remove.append(convoy)
 			continue
-		convoy["step_elapsed"] = 0.0
 
 		var target_unit := _find_any_unit(convoy["target_unit_name"])
 		if target_unit == null:
 			to_remove.append(convoy)
 			continue
 
-		var cur_col := int(convoy["col"])
-		var cur_row := int(convoy["row"])
 		var target_pos: Vector2i = hex_map.get_unit_pos(target_unit.unit_name)
 
-		# Already at target — deliver
-		if cur_col == target_pos.x and cur_row == target_pos.y:
-			var qty_d := float(convoy.get("quantity", target_unit.STR))
-			target_unit.SUPPLY = minf(7.0, target_unit.SUPPLY + qty_d / maxf(1.0, target_unit.STR))
-			_refresh_stat_label_for(target_unit.unit_name)
-			to_remove.append(convoy)
-			continue
-
-		# Calculate next step
-		var path: Array = hex_map.calc_path(cur_col, cur_row, target_pos.x, target_pos.y)
+		var path: Array = hex_map.calc_path(col, row, target_pos.x, target_pos.y)
 		if path.is_empty():
 			to_remove.append(convoy)
 			continue
 
-		# Determine next cell (path may or may not include current pos)
 		var step_idx := 0
-		if path.size() > 0:
-			var first = path[0]
-			if int(first[0]) == cur_col and int(first[1]) == cur_row:
-				step_idx = 1
+		if not path.is_empty() and int(path[0][0]) == col and int(path[0][1]) == row:
+			step_idx = 1
 		if step_idx >= path.size():
 			to_remove.append(convoy)
 			continue
 
 		var nxt = path[step_idx]
-		var next_col := int(nxt[0])
-		var next_row := int(nxt[1])
+		convoy["col"] = int(nxt[0])
+		convoy["row"] = int(nxt[1])
+		convoy["step_in_progress"] = true
 
-		convoy["col"] = next_col
-		convoy["row"] = next_row
+		var cid := int(convoy["id"])
 		if hex_map.has_method("update_convoy_marker"):
-			hex_map.update_convoy_marker(str(convoy["id"]), next_col, next_row)
-
-		# Check interception by enemy units at new position
-		var is_player: bool = convoy["is_player"]
-		var interceptors := _enemy_entries if is_player else _units_list
-		var intercepted := false
-		for ientry: Dictionary in interceptors:
-			var iu: Unit = ientry.get("unit") as Unit
-			if iu == null:
-				continue
-			var ipos: Vector2i = hex_map.get_unit_pos(iu.unit_name)
-			if ipos.x == next_col and ipos.y == next_row:
-				var qty_i := float(convoy.get("quantity", iu.STR))
-				iu.SUPPLY = minf(7.0, iu.SUPPLY + qty_i / maxf(1.0, iu.STR))
-				intercepted = true
-				to_remove.append(convoy)
-				break
-		if intercepted:
-			continue
-
-		# Check if reached target
-		if next_col == target_pos.x and next_row == target_pos.y:
-			var qty_t := float(convoy.get("quantity", target_unit.STR))
-			target_unit.SUPPLY = minf(7.0, target_unit.SUPPLY + qty_t / maxf(1.0, target_unit.STR))
-			_refresh_stat_label_for(target_unit.unit_name)
-			to_remove.append(convoy)
+			hex_map.update_convoy_marker(str(cid), convoy["col"], convoy["row"], func():
+				for c: Dictionary in _convoys:
+					if int(c["id"]) == cid:
+						c["step_in_progress"] = false
+						break
+			)
+		else:
+			convoy["step_in_progress"] = false
 
 	for convoy: Dictionary in to_remove:
 		_convoys.erase(convoy)
 		if hex_map.has_method("remove_convoy_marker"):
 			hex_map.remove_convoy_marker(str(convoy["id"]))
+
+
+func _try_consume_convoy_at(convoy: Dictionary, col: int, row: int, hex_map: Node, qty: float) -> bool:
+	var is_player: bool = convoy["is_player"]
+	var target_name: String = convoy["target_unit_name"]
+
+	# Same-faction: target unit first, then any other friendly at this hex
+	var friendly_list := _units_list if is_player else _enemy_entries
+	var target_unit: Unit = null
+	var other_friendly: Unit = null
+	for fentry: Dictionary in friendly_list:
+		var fu: Unit = fentry.get("unit") as Unit
+		if fu == null:
+			continue
+		var fpos: Vector2i = hex_map.get_unit_pos(fu.unit_name)
+		if fpos.x == col and fpos.y == row:
+			if fu.unit_name == target_name:
+				target_unit = fu
+				break
+			elif other_friendly == null:
+				other_friendly = fu
+
+	var recipient: Unit = target_unit if target_unit != null else other_friendly
+	if recipient != null:
+		recipient.SUPPLY = minf(7.0, recipient.SUPPLY + qty / maxf(1.0, recipient.STR))
+		if is_player:
+			_refresh_stat_label_for(recipient.unit_name)
+		return true
+
+	# No friendly at hex — enemy can intercept
+	var enemy_list := _enemy_entries if is_player else _units_list
+	for eentry: Dictionary in enemy_list:
+		var eu: Unit = eentry.get("unit") as Unit
+		if eu == null:
+			continue
+		var epos: Vector2i = hex_map.get_unit_pos(eu.unit_name)
+		if epos.x == col and epos.y == row:
+			eu.SUPPLY = minf(7.0, eu.SUPPLY + qty / maxf(1.0, eu.STR))
+			return true
+
+	return false
 
 
 # ── Victory condition ─────────────────────────────────────────────────────────

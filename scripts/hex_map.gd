@@ -193,13 +193,17 @@ func register_unit(unit: Unit, color: Color = Color(0.25, 0.55, 1.0),
 		col = sp.x
 		row = sp.y
 	var m := _create_unit_marker_node(unit.unit_name, col, row, color, is_enemy)
+	if m.is_empty():
+		push_warning("HexMap: failed to create marker for %s" % unit.unit_name)
+		return
+	var marker_node: Node3D = m.get("marker_root") as Node3D
 	_units[unit.unit_name] = {
 		"unit": unit,
 		"col": col,
 		"row": row,
 		"color": color,
 		"is_enemy": is_enemy,
-		"marker_root": m["marker_root"],
+		"marker_root": marker_node,
 		"move_queue": [],
 		"current_tween": null,
 		"is_moving": false,
@@ -684,8 +688,10 @@ func _recreate_all_markers() -> void:
 	for unit_name: String in _units:
 		var d: Dictionary = _units[unit_name]
 		var m := _create_unit_marker_node(unit_name, int(d["col"]), int(d["row"]),
-				d.get("color", Color(0.25, 0.55, 1.0)) as Color)
-		d["marker_root"] = m["marker_root"]
+				d.get("color", Color(0.25, 0.55, 1.0)) as Color,
+				bool(d.get("is_enemy", false)))
+		if not m.is_empty():
+			d["marker_root"] = m.get("marker_root") as Node3D
 		update_unit_org(unit_name, (d["unit"] as Unit).ORG)
 
 
@@ -847,9 +853,9 @@ func rename_unit(old_name: String, new_name: String) -> void:
 	var d: Dictionary = _units[old_name]
 	_units.erase(old_name)
 	_units[new_name] = d
-	var lbl: Label3D = d.get("name_label")
-	if is_instance_valid(lbl):
-		lbl.text = new_name
+	var marker: UnitMarker = d.get("marker_root") as UnitMarker
+	if is_instance_valid(marker):
+		marker.set_unit_name(new_name)
 
 
 func teleport_unit(unit_name: String, col: int, row: int) -> void:
@@ -890,7 +896,7 @@ func get_unit_templates() -> Array:
 func ensure_unit_templates() -> void:
 	if not _unit_templates.is_empty():
 		return
-	var player_names := ["第1装甲旅", "第2机步旅", "第3步兵旅", "第4炮兵旅", "第5特战旅"]
+	var player_names := ["第一重骑队", "第二长矛队", "第三步卒队", "第四弓弩队", "第五斥候队"]
 	var enemy_names  := ["赤甲一部", "赤甲二部", "赤甲三部", "赤甲四部", "赤甲五部"]
 	for i in range(player_unit_count):
 		_unit_templates.append({
@@ -1437,9 +1443,11 @@ func add_convoy_marker(convoy_id: String, col: int, row: int, color: Color) -> v
 	_convoy_markers[convoy_id] = root
 
 
-func update_convoy_marker(convoy_id: String, col: int, row: int) -> void:
+func update_convoy_marker(convoy_id: String, col: int, row: int, on_arrived: Callable = Callable()) -> void:
 	var root: Node3D = _convoy_markers.get(convoy_id) as Node3D
 	if not is_instance_valid(root):
+		if on_arrived.is_valid():
+			on_arrived.call()
 		return
 	var target_pos := hex_to_world(col, row)
 	if root is SupplyMarker:
@@ -1448,6 +1456,8 @@ func update_convoy_marker(convoy_id: String, col: int, row: int) -> void:
 		_face_marker_towards(root, target_pos)
 	var tween := create_tween()
 	tween.tween_property(root, "position", target_pos, 1.0)
+	if on_arrived.is_valid():
+		tween.tween_callback(on_arrived)
 
 
 func remove_convoy_marker(convoy_id: String) -> void:

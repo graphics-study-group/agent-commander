@@ -61,6 +61,11 @@ func _setup_health_bar_materials() -> void:
 		_hp_bg.material_override = _hp_bg_mat
 
 
+func set_unit_name(new_name: String) -> void:
+	if is_instance_valid(_name_label):
+		_name_label.text = new_name
+
+
 func face_towards(target_pos: Vector3) -> void:
 	if not is_instance_valid(_visual):
 		return
