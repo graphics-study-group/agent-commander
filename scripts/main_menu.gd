@@ -5,6 +5,8 @@ const EDITOR_SCENE_PATH := "res://scenes/map_editor.tscn"
 const RES_MAP_DIR := "res://maps"
 const USER_MAP_DIR := "user://maps"
 const GAME_START_BGM_LEAD_SEC := 0.85
+const FIXED_MAP_PATH := "res://maps/法兰西-俄罗斯.tres"
+const FIXED_MAP_RESOURCE := preload("res://maps/法兰西-俄罗斯.tres")
 
 @onready var _map_option: OptionButton = $CenterPanel/Panel/PanelVBox/MapRow/MapOption
 @onready var _status_label: Label = $CenterPanel/Panel/PanelVBox/StatusLabel
@@ -33,6 +35,8 @@ func _ready() -> void:
 
 func _refresh_maps() -> void:
 	_map_option.clear()
+	var seen: Dictionary = {}
+	_add_map_entry(FIXED_MAP_PATH, "preset", seen)
 	_add_maps_from_dir(RES_MAP_DIR, "res://")
 	_add_maps_from_dir(USER_MAP_DIR, "user://")
 	if _map_option.item_count > 0:
@@ -40,6 +44,9 @@ func _refresh_maps() -> void:
 
 
 func _add_maps_from_dir(dir_path: String, prefix: String) -> void:
+	var seen: Dictionary = {}
+	for i in range(_map_option.item_count):
+		seen[String(_map_option.get_item_metadata(i))] = true
 	var files := DirAccess.get_files_at(dir_path)
 	files.sort()
 	for file_name in files:
@@ -48,8 +55,22 @@ func _add_maps_from_dir(dir_path: String, prefix: String) -> void:
 			continue
 		var full_path := prefix + "maps/" + file_name
 		var label := "%s [%s]" % [file_name.get_basename(), prefix.trim_suffix("/")]
-		_map_option.add_item(label)
-		_map_option.set_item_metadata(_map_option.item_count - 1, full_path)
+		_add_map_entry(full_path, label, seen)
+
+
+func _add_map_entry(full_path: String, label_hint: String, seen: Dictionary) -> void:
+	if full_path.is_empty():
+		return
+	if seen.has(full_path):
+		return
+	if not ResourceLoader.exists(full_path):
+		return
+	var label := label_hint
+	if label == "preset":
+		label = "%s [preset]" % full_path.get_file().get_basename()
+	_map_option.add_item(label)
+	_map_option.set_item_metadata(_map_option.item_count - 1, full_path)
+	seen[full_path] = true
 
 
 func _on_refresh_pressed() -> void:
