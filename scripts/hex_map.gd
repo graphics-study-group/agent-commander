@@ -21,6 +21,7 @@ const TILE_SCENE_MOUNTAIN := preload("res://scenes/tiles/MountainTile.tscn")
 const TILE_SCENE_WATER := preload("res://scenes/tiles/WaterTile.tscn")
 const TILE_SCENE_CITY := preload("res://scenes/tiles/CityTile.tscn")
 const UNIT_MARKER_SCENE := preload("res://scenes/units/UnitMarker.tscn")
+const SUPPLY_MARKER_SCENE := preload("res://scenes/units/SupplyMarker.tscn")
 
 @export var auto_generate_on_ready := true
 @export_file("*.tres", "*.res") var startup_map_path := ""
@@ -1422,20 +1423,15 @@ func add_convoy_marker(convoy_id: String, col: int, row: int, color: Color) -> v
 		return
 	if not is_instance_valid(_generated_root):
 		return
-	var root := Node3D.new()
-	root.name = "Convoy_" + convoy_id
+	if SUPPLY_MARKER_SCENE == null:
+		push_warning("HexMap: SupplyMarker scene is missing.")
+		return
+	var root := SUPPLY_MARKER_SCENE.instantiate() as SupplyMarker
+	if root == null:
+		push_warning("HexMap: failed to instantiate SupplyMarker scene.")
+		return
 	root.position = hex_to_world(col, row)
-	var box_mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(0.22, 0.22, 0.22)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color     = color
-	mat.emission_enabled = true
-	mat.emission         = color * 0.6
-	box_mesh.mesh              = box
-	box_mesh.material_override = mat
-	box_mesh.position          = Vector3(0.0, 1.38, 0.0)
-	root.add_child(box_mesh)
+	root.configure(convoy_id, color)
 	_generated_root.add_child(root)
 	_enable_shadows_on_subtree(root)
 	_convoy_markers[convoy_id] = root
