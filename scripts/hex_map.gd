@@ -115,26 +115,18 @@ func _process(_delta: float) -> void:
 		else:
 			_tooltip.visible = false
 
-	# Hex hover: update hovered cell via ray→ground-plane intersection
+	# Hex hover: update hovered cell via tile collision picking
 	if _hover_highlight != null:
-		var ray_from := camera.project_ray_origin(mouse_pos)
-		var ray_dir  := camera.project_ray_normal(mouse_pos)
-		var show := false
-		if abs(ray_dir.y) > 0.001:
-			var t := -ray_from.y / ray_dir.y
-			if t > 0.0:
-				var hit := ray_from + ray_dir * t
-				var hx  := world_to_hex(hit)
-				if _in_bounds(hx.x, hx.y):
-					_hovered_hex = hx
-					var wpos := hex_to_world(hx.x, hx.y)
-					_hover_highlight.position = Vector3(wpos.x, 1.03, wpos.z)
-					_hover_highlight.visible = true
-					_hover_label.text = "(%d,%d)" % [hx.x, hx.y]
-					_hover_label.position = Vector3(wpos.x, 1.7, wpos.z)
-					_hover_label.visible = true
-					show = true
-		if not show:
+		var tile := _pick_tile_under_cursor()
+		if tile != null and _in_bounds(tile.grid_col, tile.grid_row):
+			_hovered_hex = Vector2i(tile.grid_col, tile.grid_row)
+			var wpos := hex_to_world(tile.grid_col, tile.grid_row)
+			_hover_highlight.position = Vector3(wpos.x, 1.03, wpos.z)
+			_hover_highlight.visible = true
+			_hover_label.text = "(%d,%d)" % [tile.grid_col, tile.grid_row]
+			_hover_label.position = Vector3(wpos.x, 1.7, wpos.z)
+			_hover_label.visible = true
+		else:
 			_hovered_hex = Vector2i(-1, -1)
 			_hover_highlight.visible = false
 			_hover_label.visible = false
@@ -154,8 +146,36 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
-			if _in_bounds(_hovered_hex.x, _hovered_hex.y):
-				hex_coord_selected.emit(_hovered_hex.x, _hovered_hex.y)
+			var tile := _pick_tile_under_cursor()
+			if tile != null and _in_bounds(tile.grid_col, tile.grid_row):
+				_hovered_hex = Vector2i(tile.grid_col, tile.grid_row)
+				hex_coord_selected.emit(tile.grid_col, tile.grid_row)
+
+
+func _pick_tile_under_cursor() -> TileBase:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return null
+	var mouse_pos := get_viewport().get_mouse_position()
+	var from := camera.project_ray_origin(mouse_pos)
+	var to := from + camera.project_ray_normal(mouse_pos) * 2000.0
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	query.collide_with_areas = true
+	query.collide_with_bodies = true
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return null
+	var collider := hit.get("collider") as Node
+	return _find_tile_node(collider)
+
+
+func _find_tile_node(node: Node) -> TileBase:
+	var cur := node
+	while cur != null:
+		if cur is TileBase:
+			return cur as TileBase
+		cur = cur.get_parent()
+	return null
 
 
 # ── Unit registration ─────────────────────────────────────────────────────────
