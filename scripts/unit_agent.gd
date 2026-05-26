@@ -688,12 +688,14 @@ func _execute_item(item: Dictionary) -> void:
 					return
 				if _hex_map.has_method("is_unit_frozen") and _hex_map.is_unit_frozen(unit.unit_name):
 					return
+				_notify_route_changed()
 				var step = path[i]
 				_hex_map.set_move_path(unit.unit_name, [[int(step[0]), int(step[1])]])
 				while true:
 					var emitted_name: String = await _hex_map.movement_finished
 					if emitted_name == unit.unit_name:
 						break
+				_notify_route_changed()
 
 		"wait":
 			var total := float(p.get("seconds", 1.0))

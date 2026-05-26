@@ -818,7 +818,14 @@ func _build_unit_route_tiles(unit_name: String) -> Array:
 		return []
 
 	var raw: Array = []
-	raw.append([int(d.get("col", 0)), int(d.get("row", 0))])
+	var start_col := int(d.get("col", 0))
+	var start_row := int(d.get("row", 0))
+	if bool(d.get("is_moving", false)):
+		var active_step = d.get("active_step", [])
+		if active_step is Array and (active_step as Array).size() >= 2:
+			start_col = int(active_step[0])
+			start_row = int(active_step[1])
+	raw.append([start_col, start_row])
 
 	var planned: Array = d.get("planned_route", [])
 	if not planned.is_empty():
