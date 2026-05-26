@@ -1431,8 +1431,8 @@ func add_convoy_marker(convoy_id: String, col: int, row: int, color: Color) -> v
 		push_warning("HexMap: failed to instantiate SupplyMarker scene.")
 		return
 	root.position = hex_to_world(col, row)
-	root.configure(convoy_id, color)
 	_generated_root.add_child(root)
+	root.configure(convoy_id, color)
 	_enable_shadows_on_subtree(root)
 	_convoy_markers[convoy_id] = root
 
@@ -1441,8 +1441,13 @@ func update_convoy_marker(convoy_id: String, col: int, row: int) -> void:
 	var root: Node3D = _convoy_markers.get(convoy_id) as Node3D
 	if not is_instance_valid(root):
 		return
+	var target_pos := hex_to_world(col, row)
+	if root is SupplyMarker:
+		(root as SupplyMarker).face_towards(target_pos)
+	else:
+		_face_marker_towards(root, target_pos)
 	var tween := create_tween()
-	tween.tween_property(root, "position", hex_to_world(col, row), 1.0)
+	tween.tween_property(root, "position", target_pos, 1.0)
 
 
 func remove_convoy_marker(convoy_id: String) -> void:

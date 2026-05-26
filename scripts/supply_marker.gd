@@ -1,40 +1,31 @@
 class_name SupplyMarker
 extends Node3D
 
+const VISUAL_GROUND_OFFSET_Y := 1.0
+
 @onready var _visual: UnitVisualBase = $Visual
-@onready var _name_label: Label3D = $NameLabel
+
+
+func _ready() -> void:
+	_resolve_visual_if_needed()
+	_snap_visual_to_ground()
 
 
 func configure(convoy_id: String, color: Color) -> void:
 	name = "Convoy_%s" % convoy_id
-	if is_instance_valid(_name_label):
-		_name_label.text = "Supply"
+	_resolve_visual_if_needed()
 	if is_instance_valid(_visual):
 		_visual.faction_color = color
 		_visual.refresh_faction_color()
-	_apply_visual_glow(color)
 
 
-func _apply_visual_glow(color: Color) -> void:
-	if not is_instance_valid(_visual):
+func face_towards(target_world_pos: Vector3) -> void:
+	var from := global_position
+	var flat_target := Vector3(target_world_pos.x, from.y, target_world_pos.z)
+	if from.distance_squared_to(flat_target) < 0.000001:
 		return
-	for node in _iter_descendants(_visual):
-		if not (node is GeometryInstance3D):
-			continue
-		var gi := node as GeometryInstance3D
-		var mat: StandardMaterial3D = null
-		if gi is MeshInstance3D:
-			var mi := gi as MeshInstance3D
-			var src := mi.get_active_material(0)
-			if src is StandardMaterial3D:
-				mat = (src as StandardMaterial3D).duplicate(true)
-		if mat == null:
-			mat = StandardMaterial3D.new()
-		mat.emission_enabled = true
-		mat.emission = color * 0.45
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
-		gi.material_override = mat
-
+	# Keep rotation on horizontal plane only.
+	look_at(flat_target, Vector3.UP)
 
 func _iter_descendants(root: Node) -> Array:
 	var out: Array = []
@@ -46,3 +37,17 @@ func _iter_descendants(root: Node) -> Array:
 				out.append(c)
 				stack.append(c)
 	return out
+
+func _snap_visual_to_ground() -> void:
+	_resolve_visual_if_needed()
+	if not is_instance_valid(_visual):
+		return
+	var p := _visual.position
+	p.y = VISUAL_GROUND_OFFSET_Y
+	_visual.position = p
+
+
+func _resolve_visual_if_needed() -> void:
+	if is_instance_valid(_visual):
+		return
+	_visual = get_node_or_null("Visual") as UnitVisualBase

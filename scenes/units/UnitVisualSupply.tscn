@@ -171,7 +171,7 @@ blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_b8187")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_orqyy"]
-albedo_color = Color(0.25, 0.55, 1, 1)
+albedo_color = Color(0.9999998, 0.21846017, 0.17220297, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3ixqc"]
 
@@ -206,7 +206,7 @@ blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_xtplh")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0y0na"]
-albedo_color = Color(0.25, 0.55, 1, 1)
+albedo_color = Color(0.9999998, 0.21846017, 0.17220297, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_x7xqi"]
 
@@ -241,7 +241,7 @@ blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_kdscf")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kp5lf"]
-albedo_color = Color(0.25, 0.55, 1, 1)
+albedo_color = Color(0.9999998, 0.21846017, 0.17220297, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_40o72"]
 
@@ -276,7 +276,7 @@ blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_4jj85")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5fbm7"]
-albedo_color = Color(0.25, 0.55, 1, 1)
+albedo_color = Color(0.9999998, 0.21846017, 0.17220297, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8huu4"]
 
@@ -311,7 +311,7 @@ blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_li4yh")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tvc7d"]
-albedo_color = Color(0.25, 0.55, 1, 1)
+albedo_color = Color(0.9999998, 0.21846017, 0.17220297, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4aib2"]
 
@@ -347,6 +347,7 @@ shadow_mesh = SubResource("ArrayMesh_q3j4r")
 
 [node name="UnitVisualSupply" type="Node3D" unique_id=1704137211]
 script = ExtResource("1_visual")
+faction_color = Color(0.9999998, 0.21846017, 0.17220297, 1)
 
 [node name="root" type="Node3D" parent="." unique_id=35237216]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, 0, 0)
