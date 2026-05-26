@@ -3,6 +3,13 @@ extends Node3D
 
 const BAR_WIDTH := 0.9
 const BAR_HEIGHT := 0.10
+
+const MODEL_SCENES := {
+	"knight":   "res://scenes/units/UnitVisualKnight.tscn",
+	"spearman": "res://scenes/units/UnitVisualSpearman.tscn",
+	"swordsman":"res://scenes/units/UnitVisualSwordsman.tscn",
+	"archer":   "res://scenes/units/UnitVisualArcher.tscn",
+}
 const DEBUG_ROUTE_TILES := [[1, 1], [2, 3], [4, 5]]
 const DEBUG_ROUTE_GRID_COLS := 16
 const DEBUG_ROUTE_GRID_ROWS := 16
@@ -20,12 +27,14 @@ const DEBUG_ROUTE_COLOR := Color(1.0, 0.9, 0.2, 1.0)
 var _hp_fg_mat: StandardMaterial3D
 var _hp_bg_mat: StandardMaterial3D
 var _route_color: Color = Color(0.25, 0.55, 1.0, 1.0)
+var _current_faction_color: Color = Color.WHITE
 
 
 func _ready() -> void:
 	_apply_debug_route()
 
 func configure(unit_name: String, color: Color, is_enemy: bool = false) -> void:
+	_current_faction_color = color
 	name = "Marker_%s" % unit_name
 	set_route_color(color)
 	_apply_debug_route()
@@ -122,3 +131,21 @@ func face_towards(target_pos: Vector3) -> void:
 		return
 	# Rotate only the visual mesh, keep HP/name anchors unrotated.
 	_visual.look_at(flat_target, Vector3.UP)
+
+
+func set_visual_model(model_type: String) -> void:
+	if not MODEL_SCENES.has(model_type):
+		return
+	var packed := load(MODEL_SCENES[model_type]) as PackedScene
+	if packed == null:
+		return
+	var new_visual := packed.instantiate() as UnitVisualBase
+	if new_visual == null:
+		return
+	if is_instance_valid(_visual):
+		_visual.queue_free()
+	new_visual.name = "Visual"
+	add_child(new_visual)
+	_visual = new_visual
+	_visual.faction_color = _current_faction_color
+	_visual.refresh_faction_color()

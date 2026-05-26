@@ -19,12 +19,14 @@ layout_mode = 2
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="OutputText" type="RichTextLabel" parent="OutputContainer" unique_id=3000005]
+[node name="OutputScroll" type="ScrollContainer" parent="OutputContainer" unique_id=3000005]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-bbcode_enabled = true
-scroll_following = true
+
+[node name="MessagesList" type="VBoxContainer" parent="OutputContainer/OutputScroll" unique_id=3000012]
+layout_mode = 2
+size_flags_horizontal = 3
 
 [node name="StatusLabel" type="Label" parent="." unique_id=3000006]
 layout_mode = 2

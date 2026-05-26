@@ -39,7 +39,8 @@ var _game_over: bool = false
 var _initial_player_str: float = 0.0
 
 @onready var _stats_container: VBoxContainer = $UnitStatsContainer
-@onready var _output:          RichTextLabel = $OutputContainer/OutputText
+@onready var _messages_list:  VBoxContainer   = $OutputContainer/OutputScroll/MessagesList
+@onready var _output_scroll:  ScrollContainer  = $OutputContainer/OutputScroll
 @onready var _status:          Label         = $StatusLabel
 @onready var _input_text:      TextEdit      = $InputContainer/InputText
 @onready var _send_btn:        Button        = $InputContainer/SendButton
@@ -58,7 +59,6 @@ func _ready() -> void:
 	$InputContainer.add_child(_target_option)
 	$InputContainer.move_child(_target_option, 0)
 
-	_output.selection_enabled = true
 	_send_btn.pressed.connect(_on_send)
 	_gm_toggle.toggled.connect(_on_gm_toggled)
 
@@ -157,6 +157,38 @@ func _rebuild_target_option() -> void:
 		_target_option.set_item_metadata(_target_option.item_count - 1, i)
 
 
+func _kill_unit(unit_name: String, is_enemy: bool) -> void:
+	var hex_map := get_tree().get_first_node_in_group("hex_map")
+	if hex_map != null and hex_map.has_method("unregister_unit"):
+		hex_map.unregister_unit(unit_name)
+	if is_enemy:
+		for i in range(_enemy_entries.size()):
+			var e: Dictionary = _enemy_entries[i]
+			var u: Unit = e.get("unit") as Unit
+			if u != null and u.unit_name == unit_name:
+				var ag: Node = e.get("agent") as Node
+				if is_instance_valid(ag):
+					ag.queue_free()
+				_enemy_entries.remove_at(i)
+				break
+	else:
+		for i in range(_units_list.size()):
+			var e: Dictionary = _units_list[i]
+			var u: Unit = e.get("unit") as Unit
+			if u != null and u.unit_name == unit_name:
+				var hbox: Node = e.get("panel_hbox")
+				var lbl: Node  = e.get("stat_label")
+				if is_instance_valid(hbox): hbox.queue_free()
+				if is_instance_valid(lbl):  lbl.queue_free()
+				var ag: Node = e.get("agent") as Node
+				if is_instance_valid(ag):
+					ag.queue_free()
+				_units_list.remove_at(i)
+				_rebuild_target_option()
+				break
+	_append("[color=orange]【%s 全军覆没，已撤出战场】[/color]" % unit_name)
+
+
 func _setup_agent() -> void:
 	var hex_map := get_tree().get_first_node_in_group("hex_map")
 
@@ -195,7 +227,7 @@ func _setup_agent() -> void:
 		var row: int          = int(tmpl.get("row", (4 + i * 3) % 16))
 
 		if hex_map != null and hex_map.has_method("register_unit"):
-			hex_map.register_unit(unit, player_color, col, row, false)
+			hex_map.register_unit(unit, player_color, col, row, false, tmpl.get("model_type", ""))
 		entry["spawn_pos"] = Vector2i(col, row)
 
 		var agent: Node = UnitAgentScript.new()
@@ -225,6 +257,8 @@ func _setup_agent() -> void:
 				_append("[color=green]  >> [%s] 数值变化: %s[/color]" % [unit.unit_name, delta_text])
 			else:
 				_append("[color=green]  >> [%s] 数值变化 [%s]: %s[/color]" % [unit.unit_name, reason, delta_text])
+			if unit.STR <= 0.0:
+				_kill_unit.call_deferred(unit.unit_name, false)
 		)
 
 		agent.debug_log.connect(func(msg: String):
@@ -268,7 +302,7 @@ func _setup_agent() -> void:
 		var erow: int = int(etmpl.get("row", (4 + i * 3) % 16))
 
 		if hex_map != null and hex_map.has_method("register_unit"):
-			hex_map.register_unit(eu, enemy_color, ecol, erow, true)
+			hex_map.register_unit(eu, enemy_color, ecol, erow, true, etmpl.get("model_type", ""))
 
 		var eagent: Node = UnitAgentScript.new()
 		add_child(eagent)
@@ -278,6 +312,8 @@ func _setup_agent() -> void:
 		eagent.stats_changed.connect(func(_payload: Dictionary):
 			if hex_map != null and hex_map.has_method("update_unit_org"):
 				hex_map.update_unit_org(eu.unit_name, eu.ORG)
+			if eu.STR <= 0.0:
+				_kill_unit.call_deferred(eu.unit_name, true)
 		)
 
 		_enemy_entries.append({"unit": eu, "agent": eagent, "spawn_pos": Vector2i(max_col, erow)})
@@ -723,7 +759,81 @@ func _md_to_bbcode(text: String) -> String:
 
 
 func _append(text: String) -> void:
-	_output.append_text(text + "\n")
+	var card := _make_message_card(text)
+	_messages_list.add_child(card)
+	call_deferred("_do_scroll_bottom")
+
+
+func _do_scroll_bottom() -> void:
+	_output_scroll.scroll_vertical = int(_output_scroll.get_v_scroll_bar().max_value)
+
+
+func _make_message_card(raw: String) -> Control:
+	var panel := PanelContainer.new()
+	var vbox  := VBoxContainer.new()
+	panel.add_child(vbox)
+
+	var header := Button.new()
+	header.text = _extract_card_header(raw)
+	header.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.toggle_mode = true
+	var hcolor := _extract_card_color(raw)
+	header.add_theme_color_override("font_color", hcolor)
+	header.add_theme_color_override("font_pressed_color", hcolor)
+	header.add_theme_color_override("font_hover_color", hcolor.lightened(0.2))
+	vbox.add_child(header)
+
+	var body := RichTextLabel.new()
+	body.bbcode_enabled = true
+	body.fit_content = true
+	body.selection_enabled = true
+	body.text = raw.strip_edges()
+	body.visible = false
+	vbox.add_child(body)
+
+	header.pressed.connect(func(): body.visible = header.button_pressed)
+	return panel
+
+
+func _extract_card_header(raw: String) -> String:
+	var t := raw.strip_edges()
+	# Try ][LABEL] or ][LABEL]: pattern to pull explicit sender name
+	var start := t.find("][")
+	if start >= 0:
+		var end_b := t.find("]", start + 2)
+		if end_b > start + 2:
+			var label := t.substr(start + 2, end_b - start - 2)
+			if not label.begins_with("/") and not label.begins_with("color") and label.length() > 0:
+				return label
+	# Fallback: strip BBCode and show plain preview
+	var plain := _strip_bbcode(t).strip_edges()
+	if plain.length() > 50:
+		plain = plain.substr(0, 50) + "…"
+	return plain if not plain.is_empty() else "消息"
+
+
+func _extract_card_color(raw: String) -> Color:
+	if "[color=red]"     in raw: return Color(0.85, 0.15, 0.15)
+	if "[color=yellow]"  in raw: return Color(0.9,  0.8,  0.1)
+	if "[color=green]"   in raw: return Color(0.2,  0.75, 0.2)
+	if "[color=orange]"  in raw: return Color(0.9,  0.6,  0.1)
+	if "[color=cyan]"    in raw: return Color(0.2,  0.8,  0.8)
+	if "[color=magenta]" in raw: return Color(0.8,  0.2,  0.8)
+	return Color(0.7, 0.7, 0.7)
+
+
+func _strip_bbcode(text: String) -> String:
+	var result := ""
+	var in_tag := false
+	for c in text:
+		if c == "[":
+			in_tag = true
+		elif c == "]":
+			in_tag = false
+		elif not in_tag:
+			result += c
+	return result
 
 
 func _format_changes(unit: Unit, changes: Dictionary) -> String:
@@ -1291,7 +1401,10 @@ func _advance_convoys(_game_delta: float) -> void:
 				_build_convoy_route_tiles(int(convoy["col"]), int(convoy["row"]), remaining_path)
 			)
 		if hex_map.has_method("update_convoy_marker"):
-			hex_map.update_convoy_marker(str(cid), convoy["col"], convoy["row"], func():
+			var step_dur := 10.0
+			if hex_map.has_method("get_step_duration"):
+				step_dur = hex_map.get_step_duration(col, row, int(convoy["col"]), int(convoy["row"]))
+			hex_map.update_convoy_marker(str(cid), convoy["col"], convoy["row"], step_dur, func():
 				for c: Dictionary in _convoys:
 					if int(c["id"]) == cid:
 						c["step_in_progress"] = false
