@@ -183,6 +183,7 @@ func setup(p_unit: Unit, hex_map: Node, extra_rules: String = "") -> void:
 
 	add_to_group("unit_agent")
 	set_process(true)
+	_notify_route_changed()
 
 
 func reload_rules(rules: String) -> void:
@@ -304,6 +305,7 @@ func enqueue_external(type: String, params: Dictionary, retain: bool = false) ->
 			unit.unit_name if unit != null else "?",
 			item["id"], type, JSON.stringify(params)
 		])
+	_notify_route_changed()
 	_maybe_start_exec()
 	return {"queued_id": item["id"], "queue_size": _exec_queue.size()}
 
@@ -316,6 +318,7 @@ func delete_queue_external(target_id: int) -> Dictionary:
 			if item.get("status") == "completed":
 				return {"skipped": true, "reason": "已完成"}
 			item["status"] = "cancelled"
+			_notify_route_changed()
 			return {"cancelled_id": target_id}
 	return {"error": "id %d 未找到" % target_id}
 
@@ -324,6 +327,7 @@ func clear_queue_external() -> Dictionary:
 	for item: Dictionary in _exec_queue:
 		if item.get("status") == "pending":
 			item["status"] = "cancelled"
+	_notify_route_changed()
 	return {"cleared": true}
 
 
@@ -334,6 +338,28 @@ func get_queue_snapshot() -> Array:
 		if st in ["pending", "running"] or (st == "completed" and item.get("retain", false)):
 			out.append(item)
 	return out
+
+
+func _collect_planned_move_steps() -> Array:
+	var out: Array = []
+	for item: Dictionary in _exec_queue:
+		if item.get("type", "") != "move":
+			continue
+		var st: String = item.get("status", "")
+		if not (st == "pending" or st == "running"):
+			continue
+		var p: Dictionary = item.get("params", {})
+		if p.has("col") and p.has("row"):
+			out.append([int(p["col"]), int(p["row"])])
+	return out
+
+
+func _notify_route_changed() -> void:
+	if _hex_map == null or unit == null:
+		return
+	if not _hex_map.has_method("set_unit_planned_route"):
+		return
+	_hex_map.set_unit_planned_route(unit.unit_name, _collect_planned_move_steps())
 
 
 # ── API trigger ───────────────────────────────────────────────────────────────
@@ -464,6 +490,7 @@ func _execute_tool(fn_name: String, args: Dictionary) -> Dictionary:
 					item["id"], item["type"],
 					JSON.stringify(item["params"]), item["retain"]
 				])
+			_notify_route_changed()
 			_maybe_start_exec()
 			return {"queued_id": item["id"], "queue_size": _exec_queue.size()}
 
@@ -476,6 +503,7 @@ func _execute_tool(fn_name: String, args: Dictionary) -> Dictionary:
 					if item.get("status") == "completed":
 						return {"skipped": true, "reason": "已完成，无需取消"}
 					item["status"] = "cancelled"
+					_notify_route_changed()
 					return {"cancelled_id": target_id}
 			return {"error": "id %d 未找到" % target_id}
 
@@ -483,6 +511,7 @@ func _execute_tool(fn_name: String, args: Dictionary) -> Dictionary:
 			for item: Dictionary in _exec_queue:
 				if item.get("status") == "pending":
 					item["status"] = "cancelled"
+			_notify_route_changed()
 			return {"cleared": true}
 
 		"dispatch_event":
@@ -564,6 +593,7 @@ func _run_exec_queue() -> void:
 		if item.is_empty():
 			break
 		item["status"] = "running"
+		_notify_route_changed()
 		await _execute_item(item)
 		if item.get("status") == "cancelled":
 			_exec_queue.erase(item)
@@ -571,7 +601,9 @@ func _run_exec_queue() -> void:
 			item["status"] = "completed"
 		else:
 			_exec_queue.erase(item)
+		_notify_route_changed()
 	_exec_running = false
+	_notify_route_changed()
 
 
 func _find_next_pending() -> Dictionary:

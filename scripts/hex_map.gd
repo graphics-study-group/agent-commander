@@ -36,8 +36,9 @@ var _spawn_row := 8
 var player_unit_count: int = 2
 var enemy_unit_count: int = 2
 
-# unit_name → {unit, col, row, color, marker_root, move_queue, current_tween,
-#              is_moving, speed_buff_kmh, speed_buff_hexes}
+# unit_name → {unit, col, row, color, marker_root, move_queue, planned_route,
+#              active_step, current_tween, is_moving, speed_buff_kmh,
+#              speed_buff_hexes}
 var _units: Dictionary = {}
 var _frozen_units: Dictionary = {}  # unit_name → true (blocks movement while in battle)
 var _unit_templates: Array = []     # Array[Dictionary] — initial unit configs saved with map
@@ -201,12 +202,15 @@ func register_unit(unit: Unit, color: Color = Color(0.25, 0.55, 1.0),
 		"is_enemy": is_enemy,
 		"marker_root": m["marker_root"],
 		"move_queue": [],
+		"planned_route": [],
+		"active_step": [],
 		"current_tween": null,
 		"is_moving": false,
 		"speed_buff_kmh": 0.0,
 		"speed_buff_hexes": 0
 	}
 	update_unit_org(unit.unit_name, unit.ORG)
+	_refresh_unit_route(unit.unit_name)
 
 
 # ── Map generation / load / save ──────────────────────────────────────────────
@@ -686,7 +690,12 @@ func _recreate_all_markers() -> void:
 		var m := _create_unit_marker_node(unit_name, int(d["col"]), int(d["row"]),
 				d.get("color", Color(0.25, 0.55, 1.0)) as Color)
 		d["marker_root"] = m["marker_root"]
+		if not d.has("planned_route"):
+			d["planned_route"] = []
+		if not d.has("active_step"):
+			d["active_step"] = []
 		update_unit_org(unit_name, (d["unit"] as Unit).ORG)
+		_refresh_unit_route(unit_name)
 
 
 func _update_marker_pos_for(unit_name: String) -> void:
@@ -729,6 +738,89 @@ func update_unit_org(unit_name: String, org: float) -> void:
 	marker_root.set_org(org)
 
 
+func _build_unit_route_tiles(unit_name: String) -> Array:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
+		return []
+
+	var raw: Array = []
+	raw.append([int(d.get("col", 0)), int(d.get("row", 0))])
+
+	var planned: Array = d.get("planned_route", [])
+	if not planned.is_empty():
+		for step in planned:
+			if step is Array and (step as Array).size() >= 2:
+				raw.append([int(step[0]), int(step[1])])
+			elif step is Vector2i:
+				var pv := step as Vector2i
+				raw.append([pv.x, pv.y])
+			elif step is Dictionary:
+				var pd := step as Dictionary
+				if pd.has("col") and pd.has("row"):
+					raw.append([int(pd["col"]), int(pd["row"])])
+	else:
+		var active_step = d.get("active_step", [])
+		if active_step is Array and (active_step as Array).size() >= 2:
+			raw.append([int(active_step[0]), int(active_step[1])])
+
+		var queue: Array = d.get("move_queue", [])
+		for step in queue:
+			if step is Array and (step as Array).size() >= 2:
+				raw.append([int(step[0]), int(step[1])])
+			elif step is Vector2i:
+				var v := step as Vector2i
+				raw.append([v.x, v.y])
+			elif step is Dictionary:
+				var sd := step as Dictionary
+				if sd.has("col") and sd.has("row"):
+					raw.append([int(sd["col"]), int(sd["row"])])
+
+	var compact: Array = []
+	var has_last := false
+	var last := Vector2i.ZERO
+	for step in raw:
+		var cur := Vector2i(int(step[0]), int(step[1]))
+		if not has_last or cur != last:
+			compact.append([cur.x, cur.y])
+			last = cur
+			has_last = true
+
+	return compact
+
+
+func _refresh_unit_route(unit_name: String) -> void:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
+		return
+	var marker_root: UnitMarker = d.get("marker_root") as UnitMarker
+	if not is_instance_valid(marker_root):
+		return
+
+	if _frozen_units.has(unit_name):
+		marker_root.clear_route()
+		return
+
+	var route_tiles := _build_unit_route_tiles(unit_name)
+	if route_tiles.size() < 2:
+		marker_root.clear_route()
+		return
+
+	marker_root.set_route_tiles(route_tiles, _grid_cols, _grid_rows)
+
+
+func _refresh_all_unit_routes() -> void:
+	for unit_name: String in _units:
+		_refresh_unit_route(unit_name)
+
+
+func set_unit_planned_route(unit_name: String, route: Array) -> void:
+	var d: Dictionary = _units.get(unit_name, {})
+	if d.is_empty():
+		return
+	d["planned_route"] = route.duplicate(true)
+	_refresh_unit_route(unit_name)
+
+
 # ── Public movement API ───────────────────────────────────────────────────────
 
 func calc_path(fc: int, fr: int, tc: int, tr: int) -> Array:
@@ -753,9 +845,16 @@ func set_move_path(unit_name: String, path: Array) -> void:
 	if _frozen_units.has(unit_name):
 		return
 	var d: Dictionary = _units.get(unit_name, {})
-	if d.is_empty() or path.is_empty():
+	if d.is_empty():
+		return
+	if path.is_empty():
+		d["move_queue"] = []
+		d["active_step"] = []
+		_refresh_unit_route(unit_name)
 		return
 	d["move_queue"] = path.duplicate()
+	d["active_step"] = []
+	_refresh_unit_route(unit_name)
 	if not d["is_moving"]:
 		_execute_next_move(unit_name)
 
@@ -776,10 +875,12 @@ func clear_move_queue(unit_name: String) -> void:
 			d["row"] = nearest.y
 	d["current_tween"] = null
 	d["move_queue"] = []
+	d["active_step"] = []
 	if d["is_moving"]:
 		d["is_moving"] = false
 		_update_marker_pos_for(unit_name)
 		movement_finished.emit(unit_name)
+	_refresh_unit_route(unit_name)
 
 
 func get_unit_pos(unit_name: String) -> Vector2i:
@@ -800,6 +901,8 @@ func freeze_unit(unit_name: String) -> void:
 	if d.is_empty():
 		return
 	d["move_queue"] = []
+	d["active_step"] = []
+	_refresh_unit_route(unit_name)
 	if not d.get("is_moving", false):
 		return
 	# If no active tween (unit just arrived, collision detected before _execute_next_move)
@@ -813,6 +916,7 @@ func freeze_unit(unit_name: String) -> void:
 
 func unfreeze_unit(unit_name: String) -> void:
 	_frozen_units.erase(unit_name)
+	_refresh_unit_route(unit_name)
 
 
 func is_unit_frozen(unit_name: String) -> bool:
@@ -863,7 +967,9 @@ func teleport_unit(unit_name: String, col: int, row: int) -> void:
 	d["is_moving"] = false
 	d["col"] = col
 	d["row"] = row
+	d["active_step"] = []
 	_update_marker_pos_for(unit_name)
+	_refresh_unit_route(unit_name)
 
 
 func get_all_units_info() -> Array:
@@ -918,6 +1024,8 @@ func unregister_unit(unit_name: String) -> void:
 		return
 	var mr: Node3D = d.get("marker_root")
 	if is_instance_valid(mr):
+		if mr is UnitMarker:
+			(mr as UnitMarker).clear_route()
 		mr.queue_free()
 	_units.erase(unit_name)
 
@@ -1142,15 +1250,19 @@ func _execute_next_move(unit_name: String) -> void:
 		return
 	var move_queue: Array = d["move_queue"]
 	if move_queue.is_empty():
+		d["active_step"] = []
 		if d["is_moving"]:
 			d["is_moving"] = false
 			_update_marker_pos_for(unit_name)
 			movement_finished.emit(unit_name)
+		_refresh_unit_route(unit_name)
 		return
 	d["is_moving"] = true
 	var next: Array = move_queue.pop_front() as Array
 	var nc: int = int(next[0])
 	var nr: int = int(next[1])
+	d["active_step"] = [nc, nr]
+	_refresh_unit_route(unit_name)
 	var u: Unit = d["unit"] as Unit
 	var col: int = int(d["col"])
 	var row: int = int(d["row"])
@@ -1173,10 +1285,12 @@ func _execute_next_move(unit_name: String) -> void:
 	tween.tween_callback(func():
 		d["col"] = nc
 		d["row"] = nr
+		d["active_step"] = []
 		d["current_tween"] = null
 		# If frozen (battle started while this step was animating): stop here
 		if _frozen_units.has(unit_name):
 			d["is_moving"] = false
+			_refresh_unit_route(unit_name)
 			movement_finished.emit(unit_name)
 			return
 		# Check for combat collision with opposite-faction unit at same hex
@@ -1187,6 +1301,7 @@ func _execute_next_move(unit_name: String) -> void:
 			var od: Dictionary = _units[other_name]
 			if int(od["col"]) == nc and int(od["row"]) == nr:
 				if bool(od.get("is_enemy", false)) != d_is_enemy:
+					_refresh_unit_route(unit_name)
 					unit_collision.emit(unit_name, other_name)
 					return  # freeze_unit will emit movement_finished for the mover
 		_execute_next_move(unit_name)

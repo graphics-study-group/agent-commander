@@ -3,17 +3,32 @@ extends Node3D
 
 const BAR_WIDTH := 0.9
 const BAR_HEIGHT := 0.10
+const DEBUG_ROUTE_TILES := [[1, 1], [2, 3], [4, 5]]
+const DEBUG_ROUTE_GRID_COLS := 16
+const DEBUG_ROUTE_GRID_ROWS := 16
+const DEBUG_ROUTE_COLOR := Color(1.0, 0.9, 0.2, 1.0)
+
+@export var debug_show_sample_route: bool = true
 
 @onready var _visual: UnitVisualBase = $Visual
+@onready var _route_renderer: RouteArrowRenderer = $RouteArrowRenderer
+@onready var _route_renderer_debug: RouteArrowRenderer = $RouteArrowRendererDebug
 @onready var _hp_fg: MeshInstance3D = $HPForeground
 @onready var _hp_bg: MeshInstance3D = $HPBackground
 @onready var _name_label: Label3D = $NameLabel
 
 var _hp_fg_mat: StandardMaterial3D
 var _hp_bg_mat: StandardMaterial3D
+var _route_color: Color = Color(0.25, 0.55, 1.0, 1.0)
+
+
+func _ready() -> void:
+	_apply_debug_route()
 
 func configure(unit_name: String, color: Color, is_enemy: bool = false) -> void:
 	name = "Marker_%s" % unit_name
+	set_route_color(color)
+	_apply_debug_route()
 	if is_instance_valid(_visual):
 		_visual.faction_color = color
 		_visual.refresh_faction_color()
@@ -26,6 +41,38 @@ func configure(unit_name: String, color: Color, is_enemy: bool = false) -> void:
 			_name_label.outline_size = 6
 		else:
 			_name_label.modulate = Color.WHITE
+
+
+func set_route_color(color: Color) -> void:
+	_route_color = color
+	if is_instance_valid(_route_renderer):
+		_route_renderer.set_faction_color(color)
+
+
+func set_route_tiles(path_tiles: Array, grid_cols: int, grid_rows: int) -> void:
+	if not is_instance_valid(_route_renderer):
+		return
+	_route_renderer.set_route_from_tiles(path_tiles, grid_cols, grid_rows, _route_color)
+
+
+func clear_route() -> void:
+	if not is_instance_valid(_route_renderer):
+		return
+	_route_renderer.clear_route()
+
+
+func _apply_debug_route() -> void:
+	if not is_instance_valid(_route_renderer_debug):
+		return
+	if not debug_show_sample_route:
+		_route_renderer_debug.clear_route()
+		return
+	_route_renderer_debug.set_route_from_tiles(
+		DEBUG_ROUTE_TILES,
+		DEBUG_ROUTE_GRID_COLS,
+		DEBUG_ROUTE_GRID_ROWS,
+		DEBUG_ROUTE_COLOR
+	)
 
 func set_org(org: float) -> void:
 	if not is_instance_valid(_hp_fg) or not is_instance_valid(_hp_bg):
