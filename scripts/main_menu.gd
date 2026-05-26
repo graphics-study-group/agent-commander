@@ -5,8 +5,8 @@ const EDITOR_SCENE_PATH := "res://scenes/map_editor.tscn"
 const RES_MAP_DIR := "res://maps"
 const USER_MAP_DIR := "user://maps"
 const GAME_START_BGM_LEAD_SEC := 0.85
-const FIXED_MAP_PATH := "res://maps/法兰西-俄罗斯.tres"
-const FIXED_MAP_RESOURCE := preload("res://maps/法兰西-俄罗斯.tres")
+const FIXED_MAP_PATH := "res://maps/对拿破仑的包围网.tres"
+const FIXED_MAP_RESOURCE := preload("res://maps/对拿破仑的包围网.tres")
 
 @onready var _map_option: OptionButton = $CenterPanel/Panel/PanelVBox/MapRow/MapOption
 @onready var _status_label: Label = $CenterPanel/Panel/PanelVBox/StatusLabel

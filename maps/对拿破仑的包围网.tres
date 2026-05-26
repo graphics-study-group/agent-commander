@@ -30,6 +30,7 @@ unit_templates = [{
 "SUPPLY": 3.0,
 "col": 6,
 "is_enemy": false,
+"model_type": "knight",
 "name": "法兰西第1骑兵军",
 "row": 25
 }, {
@@ -45,6 +46,7 @@ unit_templates = [{
 "SUPPLY": 3.0,
 "col": 7,
 "is_enemy": false,
+"model_type": "spearman",
 "name": "法兰西第2近卫军",
 "row": 26
 }, {
@@ -75,6 +77,7 @@ unit_templates = [{
 "SUPPLY": 3.0,
 "col": 3,
 "is_enemy": false,
+"model_type": "archer",
 "name": "法兰西第4炮兵旅",
 "row": 17
 }, {
@@ -120,6 +123,7 @@ unit_templates = [{
 "SUPPLY": 3.0,
 "col": 27,
 "is_enemy": true,
+"model_type": "knight",
 "name": "俄罗斯第3骑兵军",
 "row": 13
 }, {
