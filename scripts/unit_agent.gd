@@ -334,16 +334,53 @@ func get_queue_snapshot() -> Array:
 
 func _collect_planned_move_steps() -> Array:
 	var out: Array = []
+	if _hex_map == null or unit == null:
+		return out
+
+	var cursor := _get_unit_pos()
 	for item: Dictionary in _exec_queue:
-		if item.get("type", "") != "move":
-			continue
 		var st: String = item.get("status", "")
 		if not (st == "pending" or st == "running"):
 			continue
+
+		var tp: String = item.get("type", "")
 		var p: Dictionary = item.get("params", {})
-		if p.has("col") and p.has("row"):
-			out.append([int(p["col"]), int(p["row"])])
+		if not p.has("col") or not p.has("row"):
+			continue
+
+		var tc := int(p["col"])
+		var tr := int(p["row"])
+		if tp == "move_to" and _hex_map.has_method("calc_path"):
+			var segment: Array = _hex_map.calc_path(cursor.x, cursor.y, tc, tr)
+			if segment.is_empty():
+				# Fall back to endpoint when dynamic obstacles make path temporarily unavailable.
+				_append_unique_step(out, tc, tr)
+				cursor = Vector2i(tc, tr)
+				continue
+			for step in segment:
+				if not (step is Array) or (step as Array).size() < 2:
+					continue
+				var sc := int(step[0])
+				var sr := int(step[1])
+				if sc == cursor.x and sr == cursor.y:
+					continue
+				_append_unique_step(out, sc, sr)
+				cursor = Vector2i(sc, sr)
+		elif tp == "move":
+			_append_unique_step(out, tc, tr)
+			cursor = Vector2i(tc, tr)
+
 	return out
+
+
+func _append_unique_step(out: Array, col: int, row: int) -> void:
+	if out.is_empty():
+		out.append([col, row])
+		return
+	var last = out[out.size() - 1]
+	if last is Array and (last as Array).size() >= 2 and int(last[0]) == col and int(last[1]) == row:
+		return
+	out.append([col, row])
 
 
 func _notify_route_changed() -> void:
