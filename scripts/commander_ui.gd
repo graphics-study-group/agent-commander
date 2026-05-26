@@ -58,6 +58,7 @@ func _ready() -> void:
 	$InputContainer.add_child(_target_option)
 	$InputContainer.move_child(_target_option, 0)
 
+	_output.selection_enabled = true
 	_send_btn.pressed.connect(_on_send)
 	_gm_toggle.toggled.connect(_on_gm_toggled)
 
@@ -377,7 +378,7 @@ func _spread_start_rows(count: int) -> Array:
 
 # ── Army split ────────────────────────────────────────────────────────────────
 
-func do_split(source_unit: Unit, _source_agent: Node, fragments: Array,
+func do_split(source_unit: Unit, source_agent: Node, fragments: Array,
 		api_history: Array) -> Dictionary:
 	if source_unit == null or fragments.size() < 2:
 		return {"error": "参数无效"}
@@ -400,6 +401,13 @@ func do_split(source_unit: Unit, _source_agent: Node, fragments: Array,
 			break
 	if src_entry.is_empty():
 		return {"error": "未找到源部队"}
+
+	var frag_spawn: Vector2i = src_entry.get("spawn_pos", src_pos)
+
+	# Add a closure so fragment AIs see splitting as already done
+	var fragment_history := api_history.duplicate()
+	if not fragment_history.is_empty() and (fragment_history[-1] as Dictionary).get("role") != "assistant":
+		fragment_history.append({"role": "assistant", "content": "拆分指令已执行完毕，各子部队已独立部署。"})
 
 	# Remove source UI panel
 	var hbox: Node = src_entry.get("panel_hbox")
@@ -432,7 +440,7 @@ func do_split(source_unit: Unit, _source_agent: Node, fragments: Array,
 		fu.PROF   = source_unit.PROF
 		fu.RECON  = source_unit.RECON
 		fu.STR    = source_unit.STR * frac
-		fu.SUPPLY = source_unit.SUPPLY * frac
+		fu.SUPPLY = source_unit.SUPPLY
 		fu.SPEED  = source_unit.SPEED
 		fu.STAFF  = source_unit.STAFF
 
@@ -443,11 +451,12 @@ func do_split(source_unit: Unit, _source_agent: Node, fragments: Array,
 		add_child(fagent)
 		fagent.setup(fu, hex_map, extra_rules)
 		fagent.debug_mode = _debug_mode
-		fagent.inject_history(api_history)
+		fagent.inject_history(fragment_history)
 
 		var new_entry := {
 			"unit": fu, "agent": fagent, "color": player_color,
-			"stat_label": null, "select_btn": null, "collapse_btn": null, "panel_hbox": null
+			"stat_label": null, "select_btn": null, "collapse_btn": null, "panel_hbox": null,
+			"spawn_pos": frag_spawn
 		}
 		_units_list.append(new_entry)
 		_add_unit_panel(new_entry)
@@ -487,6 +496,25 @@ func do_split(source_unit: Unit, _source_agent: Node, fragments: Array,
 	if _commander_agent != null and _commander_agent.has_method("reload_rules"):
 		_commander_agent.reload_rules(extra_rules)
 
+	# Reassign existing convoys for source to fragments:
+	# largest fragment (by str_fraction) inherits them; others get a new convoy spawned immediately
+	var frags_by_size := fragments.duplicate()
+	frags_by_size.sort_custom(func(a, b): return float(a.get("str_fraction", 0.5)) > float(b.get("str_fraction", 0.5)))
+	var largest_name: String = frags_by_size[0].get("name", "") if not frags_by_size.is_empty() else ""
+	var hex_map2 := get_tree().get_first_node_in_group("hex_map")
+	for c: Dictionary in _convoys:
+		if c["target_unit_name"] == source_unit.unit_name:
+			c["target_unit_name"] = largest_name
+	for frag in frags_by_size.slice(1):
+		var fn2: String = frag.get("name", "")
+		var fu2 := _find_any_unit(fn2)
+		if fu2 == null or hex_map2 == null:
+			continue
+		for entry2: Dictionary in _units_list:
+			if entry2.get("unit") == fu2:
+				_spawn_convoy(fu2, true, entry2, hex_map2)
+				break
+
 	# Notify new units
 	for i in range(_units_list.size() - fragments.size(), _units_list.size()):
 		var fagent: Node = _units_list[i]["agent"]
@@ -494,6 +522,10 @@ func do_split(source_unit: Unit, _source_agent: Node, fragments: Array,
 			fagent.receive_event("unit_split", {
 				"message": "本部队由[%s]拆分而来，继承其作战记忆，现独立指挥。" % source_unit.unit_name
 			})
+
+	# Schedule source agent cleanup after its final API response
+	if is_instance_valid(source_agent):
+		source_agent.response_ready.connect(func(_n): source_agent.queue_free(), CONNECT_ONE_SHOT)
 
 	return {"split": true, "source": source_unit.unit_name, "fragments": new_names}
 
@@ -1094,7 +1126,8 @@ func _spawn_convoy(target_unit: Unit, is_player: bool, entry: Dictionary, hex_ma
 		"is_player":        is_player,
 		"col":              spawn_pos.x,
 		"row":              spawn_pos.y,
-		"step_elapsed":     0.0
+		"step_elapsed":     0.0,
+		"quantity":         target_unit.STR
 	})
 	if hex_map.has_method("add_convoy_marker"):
 		var convoy_color := Color(0.25, 0.55, 1.0) if is_player else Color(0.85, 0.15, 0.15)
@@ -1122,7 +1155,8 @@ func _advance_convoys(game_delta: float) -> void:
 			if iu == null: continue
 			var ipos: Vector2i = hex_map.get_unit_pos(iu.unit_name)
 			if ipos.x == cur_col_c and ipos.y == cur_row_c:
-				iu.SUPPLY = minf(7.0, iu.SUPPLY + 1.0)
+				var qty_c := float(convoy.get("quantity", iu.STR))
+				iu.SUPPLY = minf(7.0, iu.SUPPLY + qty_c / maxf(1.0, iu.STR))
 				to_remove.append(convoy)
 				instant_intercepted = true
 				break
@@ -1144,7 +1178,8 @@ func _advance_convoys(game_delta: float) -> void:
 
 		# Already at target — deliver
 		if cur_col == target_pos.x and cur_row == target_pos.y:
-			target_unit.SUPPLY = minf(7.0, target_unit.SUPPLY + 1.0)
+			var qty_d := float(convoy.get("quantity", target_unit.STR))
+			target_unit.SUPPLY = minf(7.0, target_unit.SUPPLY + qty_d / maxf(1.0, target_unit.STR))
 			_refresh_stat_label_for(target_unit.unit_name)
 			to_remove.append(convoy)
 			continue
@@ -1184,7 +1219,8 @@ func _advance_convoys(game_delta: float) -> void:
 				continue
 			var ipos: Vector2i = hex_map.get_unit_pos(iu.unit_name)
 			if ipos.x == next_col and ipos.y == next_row:
-				iu.SUPPLY = minf(7.0, iu.SUPPLY + 1.0)
+				var qty_i := float(convoy.get("quantity", iu.STR))
+				iu.SUPPLY = minf(7.0, iu.SUPPLY + qty_i / maxf(1.0, iu.STR))
 				intercepted = true
 				to_remove.append(convoy)
 				break
@@ -1193,7 +1229,8 @@ func _advance_convoys(game_delta: float) -> void:
 
 		# Check if reached target
 		if next_col == target_pos.x and next_row == target_pos.y:
-			target_unit.SUPPLY = minf(7.0, target_unit.SUPPLY + 1.0)
+			var qty_t := float(convoy.get("quantity", target_unit.STR))
+			target_unit.SUPPLY = minf(7.0, target_unit.SUPPLY + qty_t / maxf(1.0, target_unit.STR))
 			_refresh_stat_label_for(target_unit.unit_name)
 			to_remove.append(convoy)
 

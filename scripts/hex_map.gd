@@ -182,6 +182,7 @@ func register_unit(unit: Unit, color: Color = Color(0.25, 0.55, 1.0),
 		"cylinder": m["cylinder"],
 		"name_label": m["name_label"],
 		"hp_bg": m["hp_bg"],
+		"hp_str": m["hp_str"],
 		"hp_fg": m["hp_fg"],
 		"move_queue": [],
 		"current_tween": null,
@@ -651,7 +652,37 @@ func _create_unit_marker_node(unit_name: String, col: int, row: int, color: Colo
 	cyl_mesh.position = Vector3(0.0, 1.5, 0.0)
 	root.add_child(cyl_mesh)
 
-	# Health bar: green (filled) segment
+	# Health bar: black background (full width, static)
+	var hp_bg := MeshInstance3D.new()
+	var hp_bg_quad := QuadMesh.new()
+	hp_bg_quad.size = Vector2(0.9, 0.10)
+	var hp_bg_mat := StandardMaterial3D.new()
+	hp_bg_mat.albedo_color = Color(0.06, 0.06, 0.06)
+	hp_bg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	hp_bg_mat.no_depth_test = true
+	hp_bg_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	hp_bg_mat.render_priority = 0
+	hp_bg.mesh = hp_bg_quad
+	hp_bg.material_override = hp_bg_mat
+	hp_bg.position = Vector3(0.0, 2.1, 0.05)
+	root.add_child(hp_bg)
+
+	# Health bar: red STR bar (behind green)
+	var hp_str := MeshInstance3D.new()
+	var hp_str_quad := QuadMesh.new()
+	hp_str_quad.size = Vector2(0.9, 0.10)
+	var hp_str_mat := StandardMaterial3D.new()
+	hp_str_mat.albedo_color = Color(0.85, 0.15, 0.1)
+	hp_str_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	hp_str_mat.no_depth_test = true
+	hp_str_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	hp_str_mat.render_priority = 1
+	hp_str.mesh = hp_str_quad
+	hp_str.material_override = hp_str_mat
+	hp_str.position = Vector3(0.0, 2.1, 0.05)
+	root.add_child(hp_str)
+
+	# Health bar: green ORG bar (front)
 	var hp_fg := MeshInstance3D.new()
 	var hp_fg_quad := QuadMesh.new()
 	hp_fg_quad.size = Vector2(0.9, 0.10)
@@ -660,24 +691,11 @@ func _create_unit_marker_node(unit_name: String, col: int, row: int, color: Colo
 	hp_fg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	hp_fg_mat.no_depth_test = true
 	hp_fg_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	hp_fg_mat.render_priority = 2
 	hp_fg.mesh = hp_fg_quad
 	hp_fg.material_override = hp_fg_mat
 	hp_fg.position = Vector3(0.0, 2.1, 0.05)
 	root.add_child(hp_fg)
-
-	# Health bar: dark (missing HP) segment — tiled right of green, same z
-	var hp_bg := MeshInstance3D.new()
-	var hp_bg_quad := QuadMesh.new()
-	hp_bg_quad.size = Vector2(0.9, 0.10)
-	var hp_bg_mat := StandardMaterial3D.new()
-	hp_bg_mat.albedo_color = Color(0.08, 0.08, 0.08)
-	hp_bg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	hp_bg_mat.no_depth_test = true
-	hp_bg_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	hp_bg.mesh = hp_bg_quad
-	hp_bg.material_override = hp_bg_mat
-	hp_bg.position = Vector3(0.0, 2.1, 0.05)
-	root.add_child(hp_bg)
 
 	# Unit name label
 	var name_lbl := Label3D.new()
@@ -699,6 +717,7 @@ func _create_unit_marker_node(unit_name: String, col: int, row: int, color: Colo
 		"marker_root": root,
 		"cylinder": cyl_mesh,
 		"hp_bg": hp_bg,
+		"hp_str": hp_str,
 		"hp_fg": hp_fg,
 		"name_label": name_lbl
 	}
@@ -712,6 +731,7 @@ func _recreate_all_markers() -> void:
 		d["marker_root"] = m["marker_root"]
 		d["cylinder"]    = m["cylinder"]
 		d["hp_bg"]       = m["hp_bg"]
+		d["hp_str"]      = m["hp_str"]
 		d["hp_fg"]       = m["hp_fg"]
 		d["name_label"]  = m["name_label"]
 		update_unit_org(unit_name, (d["unit"] as Unit).ORG)
@@ -731,19 +751,21 @@ func update_unit_org(unit_name: String, org: float) -> void:
 	var d: Dictionary = _units.get(unit_name, {})
 	if d.is_empty():
 		return
-	var hp_fg: MeshInstance3D = d.get("hp_fg")
-	var hp_bg: MeshInstance3D = d.get("hp_bg")
-	if not is_instance_valid(hp_fg) or not is_instance_valid(hp_bg):
+	var hp_fg: MeshInstance3D  = d.get("hp_fg")
+	var hp_str: MeshInstance3D = d.get("hp_str")
+	if not is_instance_valid(hp_fg) or not is_instance_valid(hp_str):
 		return
-	const W := 0.9   # total bar width
-	var pct    := clampf(org / 100.0, 0.0, 1.0)
-	var fg_w   := W * pct
-	var bg_w   := W * (1.0 - pct)
-	# Resize meshes directly — avoids billboard/world-scale mismatch
-	(hp_fg.mesh as QuadMesh).size = Vector2(fg_w, 0.10)
-	hp_fg.position = Vector3(-W / 2.0 + fg_w / 2.0, 2.1, 0.05)
-	(hp_bg.mesh as QuadMesh).size = Vector2(bg_w, 0.10)
-	hp_bg.position = Vector3(W / 2.0 - bg_w / 2.0, 2.1, 0.05)
+	var u: Unit = d.get("unit") as Unit
+	var str_val: float = u.STR if u != null else 100.0
+	const W := 0.9
+	var org_pct := clampf(org / 100.0, 0.0, 1.0)
+	var str_pct := clampf(str_val / 100.0, 0.0, 1.0)
+	var org_w   := W * org_pct
+	var str_w   := W * str_pct
+	(hp_fg.mesh as QuadMesh).size  = Vector2(org_w, 0.10)
+	hp_fg.position = Vector3(-W / 2.0 + org_w / 2.0, 2.1, 0.05)
+	(hp_str.mesh as QuadMesh).size = Vector2(str_w, 0.10)
+	hp_str.position = Vector3(-W / 2.0 + str_w / 2.0, 2.1, 0.05)
 
 
 # ── Public movement API ───────────────────────────────────────────────────────

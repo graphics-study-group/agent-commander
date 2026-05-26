@@ -6,7 +6,7 @@ signal debug_log(msg: String)
 
 const DeepSeekAPI = preload("res://scripts/deepseek_api.gd")
 const TOKEN_WARN_CHARS := 3_000_000
-const IDLE_REASSESS_INTERVAL := 30.0  # real wall-clock seconds
+const IDLE_REASSESS_INTERVAL := 30.0  # game-time seconds (respects Engine.time_scale)
 
 var _api: Node
 var _hex_map: Node
@@ -15,7 +15,7 @@ var _player_entries: Array = []  # [{unit, agent, ...}] read-only context
 var _enemy_entries: Array = []   # [{unit, agent}] we command these
 
 var _is_processing: bool = false
-var _last_reassess_time: float = 0.0
+var _idle_elapsed: float = 0.0
 var _inbox: Array = []
 var _next_event_id: int = 0
 var debug_mode: bool = false: set = _set_debug_mode
@@ -145,7 +145,7 @@ func setup(player_entries: Array, enemy_entries: Array,
 	_api.request_failed.connect(_on_error)
 
 	set_process(true)
-	_last_reassess_time = Time.get_unix_time_from_system()
+	_idle_elapsed = 0.0
 
 
 func reload_rules(rules: String) -> void:
@@ -156,7 +156,7 @@ func reload_rules(rules: String) -> void:
 # ── Public event API ──────────────────────────────────────────────────────────
 
 func receive_event(event_type: String, event_info: Dictionary) -> void:
-	_last_reassess_time = Time.get_unix_time_from_system()
+	_idle_elapsed = 0.0
 	var event := {
 		"id":        _next_event_id,
 		"type":      event_type,
@@ -171,12 +171,12 @@ func receive_event(event_type: String, event_info: Dictionary) -> void:
 
 # ── Idle reassess timer ───────────────────────────────────────────────────────
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _is_processing or _api == null:
 		return
-	var now := Time.get_unix_time_from_system()
-	if now - _last_reassess_time >= IDLE_REASSESS_INTERVAL:
-		_last_reassess_time = now
+	_idle_elapsed += delta
+	if _idle_elapsed >= IDLE_REASSESS_INTERVAL:
+		_idle_elapsed = 0.0
 		receive_event("idle_reassess", {"trigger": "30秒无新事件，自动重新评估战场态势"})
 
 
@@ -240,8 +240,9 @@ func _build_all_units_context() -> String:
 			if not queue.is_empty():
 				var q_strs: Array[String] = []
 				for item: Dictionary in queue:
-					q_strs.append("#%d[%s]%s" % [
-						item.get("id", 0), item.get("status", ""), item.get("type", "")])
+					q_strs.append("#%d[%s]%s %s" % [
+						item.get("id", 0), item.get("status", ""), item.get("type", ""),
+						JSON.stringify(item.get("params", {}))])
 				lines.append("    队列: " + ", ".join(q_strs))
 
 	return "\n".join(lines)

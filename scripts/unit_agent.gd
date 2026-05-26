@@ -19,6 +19,7 @@ var _is_processing: bool = false
 var _exec_running: bool = false
 var _next_event_id: int = 0
 var _next_queue_id: int = 0
+var _has_split: bool = false
 var debug_mode: bool = false: set = _set_debug_mode
 var _in_battle: bool = false
 
@@ -537,6 +538,8 @@ func _execute_tool(fn_name: String, args: Dictionary) -> Dictionary:
 			return {"ok": true, "old_name": old_name, "new_name": new_name}
 
 		"split_unit":
+			if _has_split:
+				return {"error": "此部队已执行过拆分，不可重复拆分"}
 			var frags: Array = args.get("fragments", [])
 			if frags.size() < 2:
 				return {"error": "至少需要拆分为2个子部队"}
@@ -545,6 +548,7 @@ func _execute_tool(fn_name: String, args: Dictionary) -> Dictionary:
 			if ui2 == null:
 				return {"error": "UI不可用"}
 			var history := get_api_history()
+			_has_split = true
 			return ui2.do_split(unit, self, frags, history)
 
 	return {"error": "未知工具: " + fn_name}
@@ -685,7 +689,17 @@ func _build_system_prompt() -> String:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 func get_api_history() -> Array:
-	return _api.get_history() if _api != null else []
+	if _api == null:
+		return []
+	var h: Array = _api.get_history()
+	# Strip any trailing assistant message with unresolved tool_calls — injecting it
+	# into a new agent would violate the API rule that tool_calls must be followed
+	# immediately by tool result messages.
+	if not h.is_empty():
+		var last = h[-1]
+		if last is Dictionary and last.get("role") == "assistant" and last.has("tool_calls"):
+			h = h.slice(0, h.size() - 1)
+	return h
 
 
 func inject_history(history: Array) -> void:
