@@ -10,6 +10,7 @@ script = ExtResource("1_game")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(-4.3711385e-08, 0.70710677, -0.7071067, 0, 0.70710677, 0.7071067, 0.99999994, 3.090862e-08, -3.0908616e-08, -20.795395, 13.268564, 0)
+shadow_enabled = true
 
 [node name="HexagonalMap" type="Node3D" parent="."]
 script = ExtResource("3_hex")

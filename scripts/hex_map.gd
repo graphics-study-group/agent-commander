@@ -319,6 +319,7 @@ func _rebuild_visuals() -> void:
 	_create_coord_labels()
 	refresh_region_labels()
 	_rebuild_victory_marker()
+	_enable_shadows_on_subtree(_generated_root)
 
 
 func _clear_generated_root() -> void:
@@ -328,6 +329,19 @@ func _clear_generated_root() -> void:
 	_generated_root.name = "GeneratedMap"
 	add_child(_generated_root)
 	_tile_nodes = []
+
+
+func _enable_shadows_on_subtree(root_node: Node) -> void:
+	if not is_instance_valid(root_node):
+		return
+	var stack: Array = [root_node]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n is GeometryInstance3D:
+			(n as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		for c in n.get_children():
+			if c is Node:
+				stack.append(c)
 
 
 func _generate_terrain() -> void:
@@ -574,6 +588,7 @@ func _generate_tiles() -> void:
 			tile.configure(col, row, _terrain[row][col], _roads[row][col], self)
 			_tile_nodes[row][col] = tile
 			_generated_root.add_child(tile)
+			_enable_shadows_on_subtree(tile)
 
 
 func _replace_tile_node(col: int, row: int) -> void:
@@ -596,6 +611,7 @@ func _replace_tile_node(col: int, row: int) -> void:
 	row_data[col] = tile
 	_tile_nodes[row] = row_data
 	_generated_root.add_child(tile)
+	_enable_shadows_on_subtree(tile)
 
 
 func _refresh_tile_and_neighbors(col: int, row: int) -> void:
@@ -637,6 +653,7 @@ func _create_unit_marker_node(unit_name: String, col: int, row: int, color: Colo
 	root.position = _unit_world_pos(col, row)
 	_generated_root.add_child(root)
 	root.configure(unit_name, color, is_enemy)
+	_enable_shadows_on_subtree(root)
 	return {
 		"marker_root": root
 	}
@@ -1373,6 +1390,7 @@ func _rebuild_victory_marker() -> void:
 	lbl.no_depth_test = true
 	lbl.position      = Vector3(0.0, 0.7, 0.0)
 	root.add_child(lbl)
+	_enable_shadows_on_subtree(root)
 	add_child(root)
 	_victory_city_marker = root
 
@@ -1399,6 +1417,7 @@ func add_convoy_marker(convoy_id: String, col: int, row: int, color: Color) -> v
 	box_mesh.position          = Vector3(0.0, 1.38, 0.0)
 	root.add_child(box_mesh)
 	_generated_root.add_child(root)
+	_enable_shadows_on_subtree(root)
 	_convoy_markers[convoy_id] = root
 
 
