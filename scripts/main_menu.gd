@@ -81,5 +81,5 @@ func _on_play_pressed() -> void:
 	var bgm := get_node_or_null("/root/BgmController")
 	if bgm != null and bgm.has_method("play_game_loop"):
 		bgm.call("play_game_loop")
-		await get_tree().create_timer(GAME_START_BGM_LEAD_SEC).timeout
+		await get_tree().create_timer(GAME_START_BGM_LEAD_SEC, true, false, true).timeout
 	get_tree().change_scene_to_file(GAME_SCENE_PATH)

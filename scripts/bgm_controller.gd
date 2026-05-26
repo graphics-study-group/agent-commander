@@ -5,11 +5,11 @@ const BGM_PATH := "res://assets/audio/Mixdown.ogg"
 const MENU_START := 0.0
 const MENU_END := 103.0
 const GAME_INTRO_START := 104.0
-const GAME_LOOP_START := 112.0
-const GAME_LOOP_END := 238.0
+const GAME_LOOP_START := 114.0
+const GAME_LOOP_END := 235.0
 
 const TRANSITION_SEC := 0.8
-const GAME_LOOP_CROSSFADE_SEC := 3.0
+const GAME_LOOP_CROSSFADE_SEC := 1.5
 const MIN_VOLUME_DB := -60.0
 const QUICK_FADE_START_DB := -16.0
 const TARGET_VOLUME_DB := 0.0
@@ -92,6 +92,7 @@ func stop_music_smooth() -> void:
 	if _transition_tween != null:
 		_transition_tween.kill()
 	_transition_tween = create_tween()
+	_transition_tween.set_ignore_time_scale(true)
 	_is_transitioning = true
 	_transition_tween.tween_property(_player, "volume_db", MIN_VOLUME_DB, TRANSITION_SEC)
 	_transition_tween.tween_callback(Callable(self, "_stop_after_fade"))
@@ -125,6 +126,7 @@ func _start_smooth_seek(target_sec: float) -> void:
 	if _transition_tween != null:
 		_transition_tween.kill()
 	_transition_tween = create_tween()
+	_transition_tween.set_ignore_time_scale(true)
 	_is_transitioning = true
 	_transition_tween.tween_property(_player, "volume_db", MIN_VOLUME_DB, TRANSITION_SEC * 0.5)
 	_transition_tween.tween_callback(Callable(self, "_seek_and_play").bind(target_sec))
@@ -142,12 +144,11 @@ func _start_crossfade_seek(target_sec: float, duration_sec: float = TRANSITION_S
 	_player_alt.stop()
 	_player_alt.volume_db = MIN_VOLUME_DB
 	_player_alt.play(target_sec)
+	_player.volume_db = TARGET_VOLUME_DB
 	_transition_tween = create_tween()
+	_transition_tween.set_ignore_time_scale(true)
 	_is_transitioning = true
-	_transition_tween.set_parallel(true)
-	_transition_tween.tween_property(_player, "volume_db", MIN_VOLUME_DB, duration_sec)
-	_transition_tween.tween_property(_player_alt, "volume_db", TARGET_VOLUME_DB, duration_sec)
-	_transition_tween.set_parallel(false)
+	_transition_tween.tween_method(Callable(self, "_apply_equal_power_crossfade"), 0.0, 1.0, duration_sec)
 	_transition_tween.tween_callback(Callable(self, "_on_crossfade_complete"))
 
 
@@ -167,6 +168,7 @@ func _start_immediate_seek_with_fade_in(target_sec: float) -> void:
 	_player.volume_db = QUICK_FADE_START_DB
 	_player.play(target_sec)
 	_transition_tween = create_tween()
+	_transition_tween.set_ignore_time_scale(true)
 	_transition_tween.tween_property(_player, "volume_db", TARGET_VOLUME_DB, TRANSITION_SEC)
 	_transition_tween.tween_callback(Callable(self, "_on_transition_complete"))
 
@@ -176,6 +178,22 @@ func _seek_and_play(target_sec: float) -> void:
 		return
 	target_sec = maxf(target_sec, 0.0)
 	_player.play(target_sec)
+
+
+func _apply_equal_power_crossfade(t: float) -> void:
+	if _player == null or _player_alt == null:
+		return
+	var x := clampf(t, 0.0, 1.0)
+	var gain_out := cos(x * PI * 0.5)
+	var gain_in := sin(x * PI * 0.5)
+	_player.volume_db = _linear_gain_to_db(gain_out)
+	_player_alt.volume_db = _linear_gain_to_db(gain_in)
+
+
+func _linear_gain_to_db(gain: float) -> float:
+	if gain <= 0.0001:
+		return MIN_VOLUME_DB
+	return clampf(linear_to_db(gain), MIN_VOLUME_DB, TARGET_VOLUME_DB)
 
 
 func _stop_after_fade() -> void:

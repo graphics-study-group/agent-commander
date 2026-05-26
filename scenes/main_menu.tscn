@@ -1,75 +1,81 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://cr27xhh7datdh"]
 
-[ext_resource type="Script" path="res://scripts/main_menu.gd" id="1_menu"]
+[ext_resource type="Script" uid="uid://cht71o2n3fyf4" path="res://scripts/main_menu.gd" id="1_menu"]
 
-[node name="MainMenu" type="Control"]
+[node name="MainMenu" type="Control" unique_id=228745169]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("1_menu")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=1536693989]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 color = Color(0.07, 0.09, 0.14, 1)
 
-[node name="CenterPanel" type="CenterContainer" parent="."]
+[node name="CenterPanel" type="CenterContainer" parent="." unique_id=111973863]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 
-[node name="Panel" type="PanelContainer" parent="CenterPanel"]
+[node name="Panel" type="PanelContainer" parent="CenterPanel" unique_id=1228136207]
 custom_minimum_size = Vector2(560, 360)
+layout_mode = 2
 
-[node name="PanelVBox" type="VBoxContainer" parent="CenterPanel/Panel"]
+[node name="PanelVBox" type="VBoxContainer" parent="CenterPanel/Panel" unique_id=1763871698]
 layout_mode = 2
 theme_override_constants/separation = 16
 alignment = 1
 
-[node name="Title" type="Label" parent="CenterPanel/Panel/PanelVBox"]
+[node name="Title" type="Label" parent="CenterPanel/Panel/PanelVBox" unique_id=1589925256]
 layout_mode = 2
 text = "Agent Commander"
 horizontal_alignment = 1
 
-[node name="Subtitle" type="Label" parent="CenterPanel/Panel/PanelVBox"]
+[node name="Subtitle" type="Label" parent="CenterPanel/Panel/PanelVBox" unique_id=564957707]
 layout_mode = 2
 text = "Choose a map, enter the battlefield, or open the editor."
 horizontal_alignment = 1
 
-[node name="MapRow" type="HBoxContainer" parent="CenterPanel/Panel/PanelVBox"]
+[node name="MapRow" type="HBoxContainer" parent="CenterPanel/Panel/PanelVBox" unique_id=1912559352]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="MapLabel" type="Label" parent="CenterPanel/Panel/PanelVBox/MapRow"]
+[node name="MapLabel" type="Label" parent="CenterPanel/Panel/PanelVBox/MapRow" unique_id=1697990210]
+custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
 text = "Map"
-custom_minimum_size = Vector2(80, 0)
 
-[node name="MapOption" type="OptionButton" parent="CenterPanel/Panel/PanelVBox/MapRow"]
+[node name="MapOption" type="OptionButton" parent="CenterPanel/Panel/PanelVBox/MapRow" unique_id=644064656]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="Buttons" type="HBoxContainer" parent="CenterPanel/Panel/PanelVBox"]
+[node name="Buttons" type="HBoxContainer" parent="CenterPanel/Panel/PanelVBox" unique_id=808609870]
 layout_mode = 2
 alignment = 1
 
-[node name="RefreshButton" type="Button" parent="CenterPanel/Panel/PanelVBox/Buttons"]
+[node name="RefreshButton" type="Button" parent="CenterPanel/Panel/PanelVBox/Buttons" unique_id=69794106]
 layout_mode = 2
 text = "Refresh"
 
-[node name="EditorButton" type="Button" parent="CenterPanel/Panel/PanelVBox/Buttons"]
+[node name="EditorButton" type="Button" parent="CenterPanel/Panel/PanelVBox/Buttons" unique_id=1529152767]
 layout_mode = 2
 text = "Map Editor"
 
-[node name="PlayButton" type="Button" parent="CenterPanel/Panel/PanelVBox/Buttons"]
+[node name="PlayButton" type="Button" parent="CenterPanel/Panel/PanelVBox/Buttons" unique_id=1098221348]
 layout_mode = 2
 text = "Start Game"
 
-[node name="StatusLabel" type="Label" parent="CenterPanel/Panel/PanelVBox"]
+[node name="StatusLabel" type="Label" parent="CenterPanel/Panel/PanelVBox" unique_id=1789416015]
 layout_mode = 2
-text = ""
 autowrap_mode = 2
