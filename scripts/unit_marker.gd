@@ -4,7 +4,7 @@ extends Node3D
 const BAR_WIDTH := 0.9
 const BAR_HEIGHT := 0.10
 
-@onready var _body: MeshInstance3D = $Body
+@onready var _visual: UnitVisualBase = $Visual
 @onready var _hp_fg: MeshInstance3D = $HPForeground
 @onready var _hp_bg: MeshInstance3D = $HPBackground
 @onready var _name_label: Label3D = $NameLabel
@@ -14,8 +14,9 @@ var _hp_bg_mat: StandardMaterial3D
 
 func configure(unit_name: String, color: Color, is_enemy: bool = false) -> void:
 	name = "Marker_%s" % unit_name
-	if is_instance_valid(_body):
-		_body.material_override = _create_body_material(color)
+	if is_instance_valid(_visual):
+		_visual.faction_color = color
+		_visual.refresh_faction_color()
 	_setup_health_bar_materials()
 	if is_instance_valid(_name_label):
 		_name_label.text = unit_name
@@ -40,13 +41,6 @@ func set_org(org: float) -> void:
 	if _hp_bg.mesh is QuadMesh:
 		(_hp_bg.mesh as QuadMesh).size = bg_size
 	_hp_bg.position = Vector3(BAR_WIDTH / 2.0 - bg_w / 2.0, 2.1, 0.05)
-
-func _create_body_material(color: Color) -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.emission_enabled = true
-	mat.emission = color * 0.5
-	return mat
 
 func _setup_health_bar_materials() -> void:
 	if _hp_fg_mat == null:

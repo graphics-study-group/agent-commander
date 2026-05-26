@@ -1,0 +1,16 @@
+[gd_scene format=3 load_steps=3]
+
+[ext_resource type="Script" path="res://scripts/unit_visual_base.gd" id="1_base"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_demo"]
+top_radius = 0.2
+bottom_radius = 0.2
+height = 0.5
+
+[node name="UnitBase" type="Node3D"]
+script = ExtResource("1_base")
+
+[node name="FactionDemoMesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("CylinderMesh_demo")
+position = Vector3(0, 0.25, 0)
+metadata/needs_faction_color = true

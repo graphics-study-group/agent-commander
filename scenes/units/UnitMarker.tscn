@@ -1,11 +1,7 @@
-[gd_scene format=3 load_steps=5]
+[gd_scene format=3 uid="uid://d23svvjsqlamo"]
 
-[ext_resource type="Script" path="res://scripts/unit_marker.gd" id="1_script"]
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_body"]
-top_radius = 0.18
-bottom_radius = 0.18
-height = 0.45
+[ext_resource type="Script" uid="uid://dl2fn65cm152" path="res://scripts/unit_marker.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://dv1sf88yejx5g" path="res://scenes/units/UnitVisualSwordsman.tscn" id="2_visual"]
 
 [sub_resource type="QuadMesh" id="QuadMesh_hp_fg"]
 size = Vector2(0.9, 0.1)
@@ -13,24 +9,22 @@ size = Vector2(0.9, 0.1)
 [sub_resource type="QuadMesh" id="QuadMesh_hp_bg"]
 size = Vector2(0.9, 0.1)
 
-[node name="UnitMarker" type="Node3D"]
+[node name="UnitMarker" type="Node3D" unique_id=1356285475]
 script = ExtResource("1_script")
 
-[node name="Body" type="MeshInstance3D" parent="."]
-mesh = SubResource("CylinderMesh_body")
-position = Vector3(0, 1.5, 0)
+[node name="Visual" parent="." unique_id=244809795 instance=ExtResource("2_visual")]
 
-[node name="HPForeground" type="MeshInstance3D" parent="."]
+[node name="HPForeground" type="MeshInstance3D" parent="." unique_id=827763057]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3, 0.05)
 mesh = SubResource("QuadMesh_hp_fg")
-position = Vector3(0, 2.1, 0.05)
 
-[node name="HPBackground" type="MeshInstance3D" parent="."]
+[node name="HPBackground" type="MeshInstance3D" parent="." unique_id=1448444759]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3, 0.05)
 mesh = SubResource("QuadMesh_hp_bg")
-position = Vector3(0, 2.1, 0.05)
 
-[node name="NameLabel" type="Label3D" parent="."]
-font_size = 48
+[node name="NameLabel" type="Label3D" parent="." unique_id=1272863895]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.45, 0)
 pixel_size = 0.006
 billboard = 1
 no_depth_test = true
-position = Vector3(0, 2.45, 0)
+font_size = 48
