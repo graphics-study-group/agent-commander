@@ -188,7 +188,7 @@ func _find_tile_node(node: Node) -> TileBase:
 
 func register_unit(unit: Unit, color: Color = Color(0.25, 0.55, 1.0),
 		preferred_col: int = -1, preferred_row: int = -1,
-		is_enemy: bool = false) -> void:
+		is_enemy: bool = false, model_type: String = "") -> void:
 	if unit == null:
 		return
 	var col := preferred_col
@@ -197,7 +197,7 @@ func register_unit(unit: Unit, color: Color = Color(0.25, 0.55, 1.0),
 		var sp := _find_start_pos(preferred_col, preferred_row)
 		col = sp.x
 		row = sp.y
-	var m := _create_unit_marker_node(unit.unit_name, col, row, color, is_enemy)
+	var m := _create_unit_marker_node(unit.unit_name, col, row, color, is_enemy, model_type)
 	if m.is_empty():
 		push_warning("HexMap: failed to create marker for %s" % unit.unit_name)
 		return
@@ -208,6 +208,7 @@ func register_unit(unit: Unit, color: Color = Color(0.25, 0.55, 1.0),
 		"row": row,
 		"color": color,
 		"is_enemy": is_enemy,
+		"model_type": model_type,
 		"marker_root": marker_node,
 		"move_queue": [],
 		"planned_route": [],
@@ -676,7 +677,7 @@ func _get_tile_node(col: int, row: int) -> TileBase:
 # ── Marker creation ───────────────────────────────────────────────────────────
 
 func _create_unit_marker_node(unit_name: String, col: int, row: int, color: Color,
-		is_enemy: bool = false) -> Dictionary:
+		is_enemy: bool = false, model_type: String = "") -> Dictionary:
 	if UNIT_MARKER_SCENE == null:
 		push_warning("HexMap: UnitMarker scene is missing.")
 		return {}
@@ -687,6 +688,8 @@ func _create_unit_marker_node(unit_name: String, col: int, row: int, color: Colo
 	root.position = _unit_world_pos(col, row)
 	_generated_root.add_child(root)
 	root.configure(unit_name, color, is_enemy)
+	if not model_type.is_empty():
+		root.set_visual_model(model_type)
 	_enable_shadows_on_subtree(root)
 	return {
 		"marker_root": root
@@ -704,7 +707,8 @@ func _recreate_all_markers() -> void:
 			d["combat_orbit"] = {}
 		var m := _create_unit_marker_node(unit_name, int(d["col"]), int(d["row"]),
 				d.get("color", Color(0.25, 0.55, 1.0)) as Color,
-				bool(d.get("is_enemy", false)))
+				bool(d.get("is_enemy", false)),
+				str(d.get("model_type", "")))
 		if m.is_empty():
 			d["marker_root"] = null
 			continue
@@ -1094,11 +1098,13 @@ func get_unit_templates() -> Array:
 func ensure_unit_templates() -> void:
 	if not _unit_templates.is_empty():
 		return
-	var player_names := ["第一重骑队", "第二长矛队", "第三步卒队", "第四弓弩队", "第五斥候队"]
-	var enemy_names  := ["赤甲一部", "赤甲二部", "赤甲三部", "赤甲四部", "赤甲五部"]
+	var player_names  := ["第一重骑队", "第二长矛队", "第三步卒队", "第四弓弩队", "第五斥候队"]
+	var player_models := ["knight",    "spearman",   "swordsman",  "archer",      "archer"]
+	var enemy_names   := ["赤甲一部", "赤甲二部", "赤甲三部", "赤甲四部", "赤甲五部"]
 	for i in range(player_unit_count):
 		_unit_templates.append({
 			"name": player_names[i] if i < player_names.size() else ("第%d部队" % (i + 1)),
+			"model_type": player_models[i] if i < player_models.size() else "swordsman",
 			"is_enemy": false,
 			"col": 0, "row": (4 + i * 3) % _grid_rows,
 			"ATK": 70.0, "DEF": 60.0, "ORG": 85.0, "MORALE": 72.0,
@@ -1108,6 +1114,7 @@ func ensure_unit_templates() -> void:
 	for i in range(enemy_unit_count):
 		_unit_templates.append({
 			"name": enemy_names[i] if i < enemy_names.size() else ("红%d部" % (i + 1)),
+			"model_type": "swordsman",
 			"is_enemy": true,
 			"col": _grid_cols - 1, "row": (4 + i * 3) % _grid_rows,
 			"ATK": 68.0, "DEF": 58.0, "ORG": 80.0, "MORALE": 70.0,
@@ -1415,6 +1422,12 @@ func _travel_time_for(unit_name: String, fc: int, fr: int, tc: int, tr: int) -> 
 	return base * 10.0 / spd
 
 
+func get_step_duration(fc: int, fr: int, tc: int, tr: int, speed: float = 10.0) -> float:
+	var dir := _get_direction(fc, fr, tc, tr)
+	var base := 5.0 if (dir >= 0 and _in_bounds(fc, fr) and (_roads[fr][fc] & (1 << dir))) else 10.0
+	return base * 10.0 / maxf(speed, 0.1)
+
+
 # ── Coordinate labels ─────────────────────────────────────────────────────────
 
 func _create_coord_labels() -> void:
@@ -1673,7 +1686,7 @@ func clear_convoy_route(convoy_id: String) -> void:
 	root.clear_route()
 
 
-func update_convoy_marker(convoy_id: String, col: int, row: int, on_arrived: Callable = Callable()) -> void:
+func update_convoy_marker(convoy_id: String, col: int, row: int, duration: float, on_arrived: Callable = Callable()) -> void:
 	var root: Node3D = _convoy_markers.get(convoy_id) as Node3D
 	if not is_instance_valid(root):
 		if on_arrived.is_valid():
@@ -1685,7 +1698,7 @@ func update_convoy_marker(convoy_id: String, col: int, row: int, on_arrived: Cal
 	else:
 		_face_marker_towards(root, target_pos)
 	var tween := create_tween()
-	tween.tween_property(root, "position", target_pos, 1.0)
+	tween.tween_property(root, "position", target_pos, duration)
 	if on_arrived.is_valid():
 		tween.tween_callback(on_arrived)
 

@@ -79,6 +79,9 @@ var _style_hint_edit: LineEdit = null
 var _player_count_spin: SpinBox = null
 var _enemy_count_spin: SpinBox = null
 var _unit_panel: Control = null
+var _vc_col_spin: SpinBox = null
+var _vc_row_spin: SpinBox = null
+var _model_select_container: VBoxContainer = null
 
 
 func _ready() -> void:
@@ -520,21 +523,21 @@ func _build_extra_ui() -> void:
 	var vc_lbl := Label.new()
 	vc_lbl.text = "胜利目标:"
 	victory_row.add_child(vc_lbl)
-	var vc_col_spin := SpinBox.new()
-	vc_col_spin.min_value = 0
-	vc_col_spin.max_value = 31
-	vc_col_spin.value = 0
-	vc_col_spin.custom_minimum_size = Vector2(58, 0)
-	victory_row.add_child(vc_col_spin)
+	_vc_col_spin = SpinBox.new()
+	_vc_col_spin.min_value = 0
+	_vc_col_spin.max_value = 31
+	_vc_col_spin.value = 0
+	_vc_col_spin.custom_minimum_size = Vector2(58, 0)
+	victory_row.add_child(_vc_col_spin)
 	var vc_comma := Label.new()
 	vc_comma.text = ","
 	victory_row.add_child(vc_comma)
-	var vc_row_spin := SpinBox.new()
-	vc_row_spin.min_value = 0
-	vc_row_spin.max_value = 31
-	vc_row_spin.value = 0
-	vc_row_spin.custom_minimum_size = Vector2(58, 0)
-	victory_row.add_child(vc_row_spin)
+	_vc_row_spin = SpinBox.new()
+	_vc_row_spin.min_value = 0
+	_vc_row_spin.max_value = 31
+	_vc_row_spin.value = 0
+	_vc_row_spin.custom_minimum_size = Vector2(58, 0)
+	victory_row.add_child(_vc_row_spin)
 	var vc_set_btn := Button.new()
 	vc_set_btn.text = "设定"
 	vc_set_btn.custom_minimum_size = Vector2(40, 0)
@@ -545,7 +548,7 @@ func _build_extra_ui() -> void:
 	victory_row.add_child(vc_clear_btn)
 	vc_set_btn.pressed.connect(func():
 		if _hex_map != null and _hex_map.has_method("set_victory_city"):
-			var vc := Vector2i(int(vc_col_spin.value), int(vc_row_spin.value))
+			var vc := Vector2i(int(_vc_col_spin.value), int(_vc_row_spin.value))
 			_hex_map.set_victory_city(vc.x, vc.y)
 			_status_label.text = "胜利目标设为 (%d,%d)" % [vc.x, vc.y]
 	)
@@ -557,11 +560,36 @@ func _build_extra_ui() -> void:
 	# Sync spinboxes when map is clicked (right-click to pick coords)
 	if _hex_map != null and _hex_map.has_signal("hex_coord_selected"):
 		_hex_map.hex_coord_selected.connect(func(col: int, row: int):
-			vc_col_spin.value = col
-			vc_row_spin.value = row
+			_vc_col_spin.value = col
+			_vc_row_spin.value = row
 		)
 	vbox.add_child(victory_row)
 	vbox.move_child(victory_row, size_row_idx + 2)
+
+	# Unit model type section
+	var model_header := HBoxContainer.new()
+	var model_hdr_lbl := Label.new()
+	model_hdr_lbl.text = "兵种模型:"
+	model_hdr_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	model_header.add_child(model_hdr_lbl)
+	var model_toggle_btn := Button.new()
+	model_toggle_btn.text = "配置 ▶"
+	model_toggle_btn.custom_minimum_size = Vector2(60, 0)
+	model_header.add_child(model_toggle_btn)
+	vbox.add_child(model_header)
+	vbox.move_child(model_header, size_row_idx + 3)
+
+	_model_select_container = VBoxContainer.new()
+	_model_select_container.visible = false
+	vbox.add_child(_model_select_container)
+	vbox.move_child(_model_select_container, size_row_idx + 4)
+
+	model_toggle_btn.pressed.connect(func():
+		_model_select_container.visible = not _model_select_container.visible
+		model_toggle_btn.text = "配置 ▼" if _model_select_container.visible else "配置 ▶"
+		if _model_select_container.visible:
+			_rebuild_model_selectors()
+	)
 
 	# Load button added to SaveRow alongside Save
 	var load_btn := Button.new()
@@ -649,8 +677,51 @@ func _on_file_selected(path: String) -> void:
 		if _hex_map.has_method("get_victory_city"):
 			var vc: Vector2i = _hex_map.get_victory_city()
 			_status_label.text = "Loaded: " + fname + ("  胜利目标:(%d,%d)" % [vc.x, vc.y] if vc.x >= 0 else "")
-	else:
-		_status_label.text = "Failed to load: " + path.get_file()
+			if vc.x >= 0 and _vc_col_spin != null and _vc_row_spin != null:
+				_vc_col_spin.value = vc.x
+				_vc_row_spin.value = vc.y
+		else:
+			_status_label.text = "Failed to load: " + path.get_file()
+	if _model_select_container != null and _model_select_container.visible:
+		_rebuild_model_selectors()
+
+
+func _rebuild_model_selectors() -> void:
+	if _model_select_container == null or _hex_map == null:
+		return
+	for child in _model_select_container.get_children():
+		child.queue_free()
+	if _hex_map.has_method("ensure_unit_templates"):
+		_hex_map.ensure_unit_templates()
+	var templates: Array = _hex_map.get_unit_templates() if _hex_map.has_method("get_unit_templates") else []
+	const MODEL_OPTIONS: Array = [
+		["骑士", "knight"],
+		["长矛", "spearman"],
+		["剑士", "swordsman"],
+		["弓手", "archer"],
+	]
+	for i in range(templates.size()):
+		var tmpl: Dictionary = templates[i]
+		var row_hbox := HBoxContainer.new()
+		var name_lbl := Label.new()
+		name_lbl.text = str(tmpl.get("name", "部队%d" % (i + 1)))
+		name_lbl.custom_minimum_size = Vector2(88, 0)
+		row_hbox.add_child(name_lbl)
+		var opt := OptionButton.new()
+		opt.custom_minimum_size = Vector2(70, 0)
+		for mo: Array in MODEL_OPTIONS:
+			opt.add_item(str(mo[0]))
+		var current: String = str(tmpl.get("model_type", "swordsman"))
+		for j in range(MODEL_OPTIONS.size()):
+			if MODEL_OPTIONS[j][1] == current:
+				opt.selected = j
+				break
+		var tmpl_idx := i
+		opt.item_selected.connect(func(idx: int):
+			templates[tmpl_idx]["model_type"] = MODEL_OPTIONS[idx][1]
+		)
+		row_hbox.add_child(opt)
+		_model_select_container.add_child(row_hbox)
 
 
 func _on_name_regions_pressed() -> void:
