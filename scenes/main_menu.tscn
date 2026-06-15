@@ -33,7 +33,7 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Panel" type="PanelContainer" parent="CenterPanel" unique_id=1228136207]
-custom_minimum_size = Vector2(560, 360)
+custom_minimum_size = Vector2(560, 420)
 layout_mode = 2
 
 [node name="PanelVBox" type="VBoxContainer" parent="CenterPanel/Panel" unique_id=1763871698]
@@ -51,6 +51,21 @@ horizontal_alignment = 1
 layout_mode = 2
 text = "Choose a map, enter the battlefield, or open the editor."
 horizontal_alignment = 1
+
+[node name="ApiKeyRow" type="HBoxContainer" parent="CenterPanel/Panel/PanelVBox" unique_id=1111111111]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ApiKeyLabel" type="Label" parent="CenterPanel/Panel/PanelVBox/ApiKeyRow" unique_id=2222222222]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "API Key"
+
+[node name="ApiKeyInput" type="LineEdit" parent="CenterPanel/Panel/PanelVBox/ApiKeyRow" unique_id=3333333333]
+layout_mode = 2
+size_flags_horizontal = 3
+secret = true
+placeholder_text = "sk-..."
 
 [node name="MapRow" type="HBoxContainer" parent="CenterPanel/Panel/PanelVBox" unique_id=1912559352]
 layout_mode = 2

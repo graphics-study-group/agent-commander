@@ -8,6 +8,7 @@ const GAME_START_BGM_LEAD_SEC := 0.85
 const FIXED_MAP_PATH := "res://maps/对拿破仑的包围网.tres"
 const FIXED_MAP_RESOURCE := preload("res://maps/对拿破仑的包围网.tres")
 
+@onready var _api_key_input: LineEdit = $CenterPanel/Panel/PanelVBox/ApiKeyRow/ApiKeyInput
 @onready var _map_option: OptionButton = $CenterPanel/Panel/PanelVBox/MapRow/MapOption
 @onready var _status_label: Label = $CenterPanel/Panel/PanelVBox/StatusLabel
 @onready var _refresh_btn: Button = $CenterPanel/Panel/PanelVBox/Buttons/RefreshButton
@@ -99,6 +100,7 @@ func _on_play_pressed() -> void:
 	var app_state := get_node_or_null("/root/AppState")
 	if app_state != null:
 		app_state.set("selected_map_path", map_path)
+		app_state.set("deepseek_api_key", _api_key_input.text.strip_edges())
 	var bgm := get_node_or_null("/root/BgmController")
 	if bgm != null and bgm.has_method("play_game_loop"):
 		bgm.call("play_game_loop")

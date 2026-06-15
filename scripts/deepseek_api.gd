@@ -3,15 +3,6 @@ extends Node
 const API_URL := "https://api.deepseek.com/chat/completions"
 const TOKEN_LOG_PATH := "token_usage.log"
 
-static func _load_api_key() -> String:
-	var fa := FileAccess.open("res://api_key.txt", FileAccess.READ)
-	if fa == null:
-		push_error("DeepSeekAPI: api_key.txt not found. Place your API key there.")
-		return ""
-	var key := fa.get_as_text().strip_edges()
-	fa.close()
-	return key
-
 var _api_key: String = ""
 var agent_type: String = "unknown"
 var model: String = "deepseek-chat"
@@ -30,7 +21,9 @@ signal request_failed(error: String)
 
 
 func _ready() -> void:
-	_api_key = _load_api_key()
+	var app_state := get_node_or_null("/root/AppState")
+	if app_state != null:
+		_api_key = app_state.get("deepseek_api_key")
 	_http = HTTPRequest.new()
 	add_child(_http)
 	_http.request_completed.connect(_on_completed)
@@ -42,7 +35,7 @@ func set_system_prompt(prompt: String) -> void:
 
 func send_message(user_content: String) -> void:
 	if _api_key.is_empty():
-		request_failed.emit("API Key 未填写，请在项目根目录放置 api_key.txt")
+		request_failed.emit("API Key 未填写，请在主菜单输入 DeepSeek API Key")
 		return
 	_tool_round = 0
 	_history.append({"role": "user", "content": user_content})
