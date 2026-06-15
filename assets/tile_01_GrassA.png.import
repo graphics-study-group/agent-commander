@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://cyuuj3wxblws"
 path.s3tc="res://.godot/imported/tile_01_GrassA.png-3fccf71027f037c20313ae70abeec8ef.s3tc.ctex"
+path.etc2="res://.godot/imported/tile_01_GrassA.png-3fccf71027f037c20313ae70abeec8ef.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/tile_01_GrassA.png"
-dest_files=["res://.godot/imported/tile_01_GrassA.png-3fccf71027f037c20313ae70abeec8ef.s3tc.ctex"]
+dest_files=["res://.godot/imported/tile_01_GrassA.png-3fccf71027f037c20313ae70abeec8ef.s3tc.ctex", "res://.godot/imported/tile_01_GrassA.png-3fccf71027f037c20313ae70abeec8ef.etc2.ctex"]
 
 [params]
 

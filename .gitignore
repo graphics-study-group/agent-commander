@@ -2,7 +2,7 @@
 .godot/
 /android/
 
-assets/
+# assets/
 .vscode/
 HISTORY.md
 PROMPTS.md

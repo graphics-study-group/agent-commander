@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://ddvnco0cbvfkp"
 path.s3tc="res://.godot/imported/tile_02_RockyMountainA.png-b5a8b05ea9d389b1ba6abb633bf9310f.s3tc.ctex"
+path.etc2="res://.godot/imported/tile_02_RockyMountainA.png-b5a8b05ea9d389b1ba6abb633bf9310f.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/tile_02_RockyMountainA.png"
-dest_files=["res://.godot/imported/tile_02_RockyMountainA.png-b5a8b05ea9d389b1ba6abb633bf9310f.s3tc.ctex"]
+dest_files=["res://.godot/imported/tile_02_RockyMountainA.png-b5a8b05ea9d389b1ba6abb633bf9310f.s3tc.ctex", "res://.godot/imported/tile_02_RockyMountainA.png-b5a8b05ea9d389b1ba6abb633bf9310f.etc2.ctex"]
 
 [params]
 

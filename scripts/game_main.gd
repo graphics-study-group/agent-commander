@@ -94,6 +94,7 @@ func _setup_options_overlay() -> void:
 func _apply_font_size(cmd_ui: Control, size: int) -> void:
 	if not is_instance_valid(cmd_ui):
 		return
-	var t := Theme.new()
-	t.default_font_size = size
-	cmd_ui.theme = t
+	cmd_ui.add_theme_font_size_override("font_size", size)
+	for child in cmd_ui.get_children():
+		if child is Control:
+			_apply_font_size(child as Control, size)

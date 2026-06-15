@@ -30,6 +30,10 @@ window/size/viewport_height=1050
 version_control/plugin_name="GitPlugin"
 version_control/autoload_on_startup=true
 
+[gui]
+
+theme/custom="res://assets/themes/cjk_theme.tres"
+
 [input]
 
 ui_left={
@@ -78,3 +82,4 @@ zoom_out={
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+textures/vram_compression/import_etc2_astc=true

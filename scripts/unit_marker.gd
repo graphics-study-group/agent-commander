@@ -13,6 +13,7 @@ const MODEL_SCENES := {
 const DEBUG_ROUTE_TILES := [[1, 1], [2, 3], [4, 5]]
 const DEBUG_ROUTE_GRID_COLS := 16
 const DEBUG_ROUTE_GRID_ROWS := 16
+const CJK_FONT_3D := preload("res://assets/fonts/NotoSansSC-Regular.ttf")
 const DEBUG_ROUTE_COLOR := Color(1.0, 0.9, 0.2, 1.0)
 
 @export var debug_show_sample_route: bool = true
@@ -43,6 +44,7 @@ func configure(unit_name: String, color: Color, is_enemy: bool = false) -> void:
 		_visual.refresh_faction_color()
 	_setup_health_bar_materials()
 	if is_instance_valid(_name_label):
+		_name_label.font = CJK_FONT_3D
 		_name_label.text = unit_name
 		if is_enemy:
 			_name_label.modulate = Color(1.0, 0.35, 0.35)

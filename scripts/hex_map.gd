@@ -6,6 +6,7 @@ const H_STEP := 1.732
 const V_STEP := 1.5
 const ROW_OFFSET := 0.866
 
+const CJK_FONT_3D := preload("res://assets/fonts/NotoSansSC-Regular.ttf")
 const HEX_DIST_KM := 40.0
 const ASTAR_GRASS := 10.0
 const ASTAR_ROAD := 5.0
@@ -1247,6 +1248,7 @@ func refresh_region_labels() -> void:
 		var cz: float = s[1] / float(s[2])
 		var lbl := Label3D.new()
 		lbl.text = rname
+		lbl.font = CJK_FONT_3D
 		lbl.font_size = 72
 		lbl.pixel_size = 0.0075
 		lbl.modulate = Color(1.0, 0.85, 0.3, 0.5)
@@ -1441,6 +1443,7 @@ func _create_coord_labels() -> void:
 	for c in range(_grid_cols):
 		var lbl := Label3D.new()
 		lbl.text = str(c)
+		lbl.font = CJK_FONT_3D
 		lbl.font_size = 48
 		lbl.pixel_size = 0.012
 		lbl.modulate = Color(1.0, 0.92, 0.4, 1.0)
@@ -1455,6 +1458,7 @@ func _create_coord_labels() -> void:
 	for r in range(_grid_rows):
 		var lbl := Label3D.new()
 		lbl.text = str(r)
+		lbl.font = CJK_FONT_3D
 		lbl.font_size = 48
 		lbl.pixel_size = 0.012
 		lbl.modulate = Color(0.4, 0.92, 1.0, 1.0)
@@ -1488,6 +1492,7 @@ func _create_hover_overlay() -> void:
 	add_child(_hover_highlight)
 
 	_hover_label = Label3D.new()
+	_hover_label.font        = CJK_FONT_3D
 	_hover_label.font_size   = 48
 	_hover_label.pixel_size  = 0.006
 	_hover_label.modulate    = Color(1.0, 1.0, 0.3, 1.0)
@@ -1637,6 +1642,7 @@ func _rebuild_victory_marker() -> void:
 	# Star label
 	var lbl := Label3D.new()
 	lbl.text          = "★胜利目标"
+	lbl.font          = CJK_FONT_3D
 	lbl.font_size     = 56
 	lbl.pixel_size    = 0.006
 	lbl.modulate      = Color(1.0, 0.9, 0.1, 1.0)

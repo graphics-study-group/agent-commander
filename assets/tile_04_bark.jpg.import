@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://38fkv0lag2fd"
 path.s3tc="res://.godot/imported/tile_04_bark.jpg-f70661efc71ee325d8384d6d24620e43.s3tc.ctex"
+path.etc2="res://.godot/imported/tile_04_bark.jpg-f70661efc71ee325d8384d6d24620e43.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/tile_04_bark.jpg"
-dest_files=["res://.godot/imported/tile_04_bark.jpg-f70661efc71ee325d8384d6d24620e43.s3tc.ctex"]
+dest_files=["res://.godot/imported/tile_04_bark.jpg-f70661efc71ee325d8384d6d24620e43.s3tc.ctex", "res://.godot/imported/tile_04_bark.jpg-f70661efc71ee325d8384d6d24620e43.etc2.ctex"]
 
 [params]
 

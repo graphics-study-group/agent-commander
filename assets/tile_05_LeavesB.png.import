@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://cxr25ob16pmkd"
 path.s3tc="res://.godot/imported/tile_05_LeavesB.png-8507179b69bd1f7f2579992c13aee9da.s3tc.ctex"
+path.etc2="res://.godot/imported/tile_05_LeavesB.png-8507179b69bd1f7f2579992c13aee9da.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/tile_05_LeavesB.png"
-dest_files=["res://.godot/imported/tile_05_LeavesB.png-8507179b69bd1f7f2579992c13aee9da.s3tc.ctex"]
+dest_files=["res://.godot/imported/tile_05_LeavesB.png-8507179b69bd1f7f2579992c13aee9da.s3tc.ctex", "res://.godot/imported/tile_05_LeavesB.png-8507179b69bd1f7f2579992c13aee9da.etc2.ctex"]
 
 [params]
 
