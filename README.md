@@ -2,6 +2,8 @@
 
 一个基于 Godot 4 的 3D 战略游戏原型，以 AI Agent 体系（DeepSeek API function calling）为核心驱动双方部队的自主决策。
 游戏演示视频链接：https://leihuo.163.com/gamejam-PKU-CAA/index.html#/workDetail/58
+<img width="1821" height="1147" alt="image" src="https://github.com/user-attachments/assets/4da856a3-ed99-4be7-a179-6f9ee1c5ef31" />
+
 
 ## 项目现状
 
